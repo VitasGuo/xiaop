@@ -56,7 +56,9 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/personality/edit',
       parentNavigatorKey: _rootNavigatorKey,
-      builder: (context, state) => const PersonalityEditScreen(),
+      builder: (context, state) => PersonalityEditScreen(
+        existing: state.extra as dynamic,
+      ),
     ),
     GoRoute(
       path: '/memory',

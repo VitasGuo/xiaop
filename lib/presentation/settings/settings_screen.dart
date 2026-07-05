@@ -82,6 +82,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           _buildApiKeyField(aiConfig),
           const SizedBox(height: 8),
           _buildTestButton(aiConfig),
+          const SizedBox(height: 16),
+          _buildContextLengthSlider(aiConfig),
           const SizedBox(height: 24),
           _buildSectionTitle('语音设置'),
           _buildTtsToggle(),
@@ -518,6 +520,55 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ),
       );
     }
+  }
+
+  Widget _buildContextLengthSlider(AiConfig aiConfig) {
+    final value = aiConfig.contextLength.toDouble();
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.cardColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Theme.of(context).dividerColor, width: 0.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('上下文长度', style: TextStyle(fontSize: 14, color: AppTheme.textPrimary)),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppTheme.accentColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  '${aiConfig.contextLength} 条消息',
+                  style: TextStyle(fontSize: 12, color: AppTheme.accentColor, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '每次对话发送给AI的历史消息数量，越多上下文越完整但消耗更多token',
+            style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+          ),
+          Slider(
+            value: value.clamp(2, 50),
+            min: 2,
+            max: 50,
+            divisions: 48,
+            activeColor: AppTheme.accentColor,
+            onChanged: (v) {
+              ref.read(aiConfigProvider.notifier).update(contextLength: v.round());
+            },
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildTtsToggle() {

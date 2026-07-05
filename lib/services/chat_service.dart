@@ -153,6 +153,8 @@ class ChatService {
     String? customUrl,
     required Companion companion,
     bool enableThinking = false,
+    int contextLength = 20,
+    CancelToken? cancelToken,
     required void Function(String token) onToken,
     required void Function(String fullText) onComplete,
     required void Function(String error) onError,
@@ -197,6 +199,10 @@ class ChatService {
 
     final systemPrompt = StringBuffer();
     systemPrompt.writeln(companion.systemPrompt);
+    if (!enableThinking) {
+      systemPrompt.writeln('');
+      systemPrompt.writeln('/no_think 请直接回答，不要展示推理过程。');
+    }
     if (memoryContext.isNotEmpty) {
       systemPrompt.writeln('');
       systemPrompt.writeln('以下是关于这个用户的记忆信息，你可以适当参考：');
@@ -210,7 +216,7 @@ class ChatService {
 
     final messages = await getMessages(conversationId);
     final recentMessages =
-        messages.length > 10 ? messages.sublist(messages.length - 10) : messages;
+        messages.length > contextLength ? messages.sublist(messages.length - contextLength) : messages;
 
     final dio = createDio(
       connectTimeout: const Duration(seconds: 30),
@@ -233,6 +239,7 @@ class ChatService {
           headers: headers,
           responseType: ResponseType.stream,
         ),
+        cancelToken: cancelToken,
         data: {
           if (modelName.isNotEmpty) 'model': modelName,
           'messages': [
@@ -284,6 +291,13 @@ class ChatService {
         onError('请求失败: ${response.statusCode}');
       }
     } catch (e) {
+      // 用户主动取消不报错
+      if (e is DioException && e.type == DioExceptionType.cancel) {
+        if (buffer.isNotEmpty) {
+          onComplete(buffer.toString());
+        }
+        return;
+      }
       if (buffer.isNotEmpty) {
         onComplete(buffer.toString());
       } else {

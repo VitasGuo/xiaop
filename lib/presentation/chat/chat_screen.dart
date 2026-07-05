@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:dio/dio.dart';
 import 'package:xiao_p/core/theme.dart';
 import 'package:xiao_p/models/chat_message.dart';
 import 'package:xiao_p/providers/ai_config_provider.dart';
 import 'package:xiao_p/providers/companion_providers.dart';
 import 'package:xiao_p/services/chat_service.dart';
+import 'package:xiao_p/services/memory_service.dart';
 import 'package:xiao_p/services/stt_service.dart';
 import 'package:xiao_p/services/tts_service.dart';
 import 'package:xiao_p/presentation/widgets/chat_bubble.dart';
@@ -29,6 +31,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   String? _error;
   String? _lastUserMessage;
   bool _isListening = false;
+  bool _enableThinking = true;
+  CancelToken? _cancelToken;
+  bool _disposed = false;
 
   final ChatService _chatService = ChatService();
   final SttService _sttService = SttService();
@@ -43,14 +48,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   @override
   void dispose() {
+    _disposed = true;
+    _cancelToken?.cancel('退出');
     _chatController.dispose();
     _scrollController.dispose();
+    _ttsService.stop();
     super.dispose();
   }
 
   Future<void> _loadMessages() async {
     final messages = await _chatService.getMessages(widget.conversationId);
-    if (mounted) {
+    if (mounted && !_disposed) {
       setState(() => _messages = messages);
       _scrollToBottom();
     }
@@ -109,7 +117,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         timestamp: DateTime.now(),
       );
 
-      if (mounted) {
+      if (mounted && !_disposed) {
         setState(() {
           _messages.add(streamingMsg);
           _loading = true;
@@ -121,6 +129,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       final buffer = StringBuffer();
       DateTime _lastUpdate = DateTime.now();
 
+      _cancelToken = CancelToken();
+
       await _chatService.streamAiResponse(
         conversationId: widget.conversationId,
         userMessage: text,
@@ -128,6 +138,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         modelName: aiConfig.model,
         customUrl: aiConfig.customUrl.isNotEmpty ? aiConfig.customUrl : null,
         companion: companion,
+        enableThinking: _enableThinking,
+        contextLength: aiConfig.contextLength,
+        cancelToken: _cancelToken!,
         onToken: (token) {
           buffer.write(token);
           // 节流：最多每50ms更新一次UI
@@ -151,16 +164,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         },
         onComplete: (fullText) async {
           // 保存完整消息到数据库
+          final finalContent = fullText.isNotEmpty ? fullText : buffer.toString();
           final finalMsg = ChatMessage(
             id: aiMsgId,
             role: 'assistant',
-            content: fullText.isNotEmpty ? fullText : buffer.toString(),
+            content: finalContent,
             timestamp: DateTime.now(),
           );
           await _chatService.addMessage(widget.conversationId, finalMsg);
           await _chatService.touchConversation(widget.conversationId);
 
-          if (mounted) {
+          // 提取记忆
+          _extractMemory(text, finalContent, aiConfig);
+
+          if (mounted && !_disposed) {
             setState(() {
               _loading = false;
             });
@@ -168,7 +185,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           }
         },
         onError: (error) {
-          if (mounted) {
+          if (mounted && !_disposed) {
             setState(() {
               _messages.removeWhere((m) => m.id == aiMsgId);
               _loading = false;
@@ -178,7 +195,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         },
       );
     } catch (e) {
-      if (mounted) {
+      if (e is DioException && e.type == DioExceptionType.cancel) {
+        // 用户退出，静默处理
+        if (mounted) setState(() => _loading = false);
+        return;
+      }
+      if (mounted && !_disposed) {
         setState(() {
           _loading = false;
           _error = e.toString().replaceFirst('Exception: ', '');
@@ -190,6 +212,43 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Future<void> _retryMessage() async {
     if (_lastUserMessage == null || _loading) return;
     await _sendMessageInternal(_lastUserMessage!);
+  }
+
+  void _extractMemory(String userMessage, String aiResponse, AiConfig aiConfig) {
+    // 简单的本地记忆提取（正则匹配）
+    try {
+      final namePatterns = [
+        RegExp(r'我叫(.{1,10})', caseSensitive: false),
+        RegExp(r'我的名字是(.{1,10})', caseSensitive: false),
+        RegExp(r'叫我(.{1,10})', caseSensitive: false),
+      ];
+      for (final p in namePatterns) {
+        final m = p.firstMatch(userMessage);
+        if (m != null) {
+          MemoryService.upsertMemory('fact', 'user_name', m.group(1)!, importance: 3);
+          break;
+        }
+      }
+
+      final emotions = {
+        '开心': RegExp(r'开心|高兴|快乐|幸福|太好了'),
+        '难过': RegExp(r'难过|伤心|不开心|郁闷|心烦'),
+        '疲惫': RegExp(r'累|疲惫|困|倦'),
+        '焦虑': RegExp(r'焦虑|担心|紧张|压力大'),
+        '无聊': RegExp(r'无聊|没意思|闷'),
+      };
+      for (final e in emotions.entries) {
+        if (e.value.hasMatch(userMessage)) {
+          MemoryService.upsertMemory('emotion', '最近情绪', '${e.key} - ${DateTime.now().toString().substring(0, 10)}', importance: 2);
+          break;
+        }
+      }
+
+      final likeMatch = RegExp(r'喜欢(.{1,20})', caseSensitive: false).firstMatch(userMessage);
+      if (likeMatch != null) {
+        MemoryService.upsertMemory('user_preference', '喜欢 ${likeMatch.group(1)}', '用户提到喜欢${likeMatch.group(1)}', importance: 2);
+      }
+    } catch (_) {}
   }
 
   void _startVoiceInput() async {
@@ -220,10 +279,22 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, size: 18),
-          onPressed: () => context.go('/conversations'),
+          onPressed: () {
+            _cancelToken?.cancel('退出');
+            context.go('/conversations');
+          },
         ),
         title: Text(companion.name),
         actions: [
+          IconButton(
+            icon: Icon(
+              _enableThinking ? Icons.psychology : Icons.psychology_outlined,
+              size: 20,
+              color: _enableThinking ? AppTheme.accentColor : AppTheme.textSecondary,
+            ),
+            tooltip: _enableThinking ? '思考模式: 开' : '思考模式: 关',
+            onPressed: () => setState(() => _enableThinking = !_enableThinking),
+          ),
           if (_messages.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.delete_outline, size: 20),

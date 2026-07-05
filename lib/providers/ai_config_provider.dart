@@ -6,18 +6,21 @@ class AiConfig {
   final String provider;
   final String model;
   final String customUrl;
+  final int contextLength;
 
   const AiConfig({
     this.provider = 'lmstudio',
     this.model = '',
     this.customUrl = '',
+    this.contextLength = 20,
   });
 
-  AiConfig copyWith({String? provider, String? model, String? customUrl}) {
+  AiConfig copyWith({String? provider, String? model, String? customUrl, int? contextLength}) {
     return AiConfig(
       provider: provider ?? this.provider,
       model: model ?? this.model,
       customUrl: customUrl ?? this.customUrl,
+      contextLength: contextLength ?? this.contextLength,
     );
   }
 
@@ -44,6 +47,7 @@ class AiConfigNotifier extends StateNotifier<AiConfig> {
   static const _keyProvider = 'ai_selected_provider';
   static const _keyModel = 'ai_selected_model';
   static const _keyCustomUrl = 'ai_custom_url';
+  static const _keyContextLength = 'ai_context_length';
 
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -54,19 +58,22 @@ class AiConfigNotifier extends StateNotifier<AiConfig> {
       provider: providerName,
       model: prefs.getString(_keyModel) ?? provider?.defaultModel ?? '',
       customUrl: prefs.getString(_keyCustomUrl) ?? provider?.defaultBaseUrl ?? '',
+      contextLength: prefs.getInt(_keyContextLength) ?? 20,
     );
   }
 
-  Future<void> update({String? provider, String? model, String? customUrl}) async {
+  Future<void> update({String? provider, String? model, String? customUrl, int? contextLength}) async {
     state = state.copyWith(
       provider: provider,
       model: model,
       customUrl: customUrl,
+      contextLength: contextLength,
     );
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyProvider, state.provider);
     await prefs.setString(_keyModel, state.model);
     await prefs.setString(_keyCustomUrl, state.customUrl);
+    await prefs.setInt(_keyContextLength, state.contextLength);
   }
 }
 

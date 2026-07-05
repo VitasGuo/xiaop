@@ -182,7 +182,13 @@ class _PersonalityScreenState extends ConsumerState<PersonalityScreen> {
             ),
             if (isActive)
               Icon(Icons.check_circle, color: AppTheme.accentColor, size: 20),
-            const SizedBox(width: 4),
+            IconButton(
+              icon: Icon(Icons.edit_outlined, size: 18, color: AppTheme.textSecondary),
+              onPressed: () async {
+                await context.push('/personality/edit', extra: saved);
+                await _loadSaved();
+              },
+            ),
             IconButton(
               icon: Icon(Icons.delete_outline, size: 18, color: AppTheme.textSecondary),
               onPressed: () async {
