@@ -119,6 +119,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       }
 
       final buffer = StringBuffer();
+      DateTime _lastUpdate = DateTime.now();
 
       await _chatService.streamAiResponse(
         conversationId: widget.conversationId,
@@ -129,14 +130,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         companion: companion,
         onToken: (token) {
           buffer.write(token);
-          if (mounted) {
+          // 节流：最多每50ms更新一次UI
+          final now = DateTime.now();
+          if (mounted && now.difference(_lastUpdate).inMilliseconds > 50) {
+            _lastUpdate = now;
+            final text = buffer.toString();
             setState(() {
               final idx = _messages.indexWhere((m) => m.id == aiMsgId);
               if (idx != -1) {
                 _messages[idx] = ChatMessage(
                   id: aiMsgId,
                   role: 'assistant',
-                  content: buffer.toString(),
+                  content: text,
                   timestamp: DateTime.now(),
                 );
               }

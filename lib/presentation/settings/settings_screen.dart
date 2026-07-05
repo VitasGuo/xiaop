@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:dio/dio.dart';
 import 'package:xiao_p/core/theme.dart';
 import 'package:xiao_p/main.dart';
@@ -87,6 +88,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: 24),
           _buildSectionTitle('外观'),
           _buildThemeSelector(currentTheme),
+          const SizedBox(height: 24),
+          _buildSectionTitle('关于'),
+          _buildAboutButton(),
         ],
       ),
     );
@@ -359,6 +363,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         const SnackBar(content: Text('已保存'), duration: Duration(seconds: 1)),
       );
     }
+  }
+
+  Widget _buildAboutButton() {
+    return GestureDetector(
+      onTap: () => context.push('/about'),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppTheme.cardColor,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Theme.of(context).dividerColor, width: 0.5),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.info_outline, color: AppTheme.textSecondary, size: 20),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text('关于小P', style: TextStyle(fontSize: 14, color: AppTheme.textPrimary)),
+            ),
+            Text('v1.0.0', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+            const SizedBox(width: 4),
+            Icon(Icons.chevron_right, color: AppTheme.textSecondary, size: 18),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _reloadApiKey(String provider) async {

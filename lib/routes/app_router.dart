@@ -8,6 +8,7 @@ import 'package:xiao_p/presentation/personality/personality_screen.dart';
 import 'package:xiao_p/presentation/personality/personality_edit_screen.dart';
 import 'package:xiao_p/presentation/memory/memory_screen.dart';
 import 'package:xiao_p/presentation/settings/settings_screen.dart';
+import 'package:xiao_p/presentation/settings/about_screen.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -61,6 +62,11 @@ final appRouter = GoRouter(
       path: '/memory',
       parentNavigatorKey: _rootNavigatorKey,
       builder: (context, state) => const MemoryScreen(),
+    ),
+    GoRoute(
+      path: '/about',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (context, state) => const AboutScreen(),
     ),
   ],
 );
