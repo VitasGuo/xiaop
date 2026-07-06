@@ -727,19 +727,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('主题色', style: TextStyle(fontSize: 14, color: AppTheme.textPrimary)),
-          const SizedBox(height: 4),
-          Text('选择后需要重启应用生效', style: TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
           const SizedBox(height: 10),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: colors.map((c) {
               return GestureDetector(
                 onTap: () async {
-                  final prefs = await SharedPreferences.getInstance();
-                  await prefs.setInt('accent_color', (c['color'] as Color).value);
+                  await ThemeService.setAccentColor(c['color'] as Color);
+                  setState(() {}); // 触发重建
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('重启应用后生效')),
+                      const SnackBar(content: Text('主题色已更新')),
                     );
                   }
                 },

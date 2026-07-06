@@ -214,7 +214,7 @@ class ChatBubble extends StatelessWidget {
         color: AppTheme.accentColor.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(10),
       ),
-      child: const Icon(Icons.person, size: 16, color: AppTheme.accentColor),
+              child: Icon(Icons.person, size: 16, color: AppTheme.accentColor),
     );
   }
 

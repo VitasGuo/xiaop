@@ -15,6 +15,7 @@ void main() async {
   ));
 
   final savedTheme = await ThemeService.getThemeMode();
+  await ThemeService.loadAccentColor();
   final prefs = await SharedPreferences.getInstance();
   final hasOnboarded = prefs.getBool('onboarded') ?? false;
 

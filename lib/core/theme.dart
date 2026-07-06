@@ -4,8 +4,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 enum AppThemeMode { dark, light, system }
 
 class AppTheme {
-  static const Color accentColor = Color(0xFF9B8EC4);
-  static const Color accentLight = Color(0xFFE8A0BF);
+  static Color accentColor = const Color(0xFF9B8EC4);
+  static Color accentLight = const Color(0xFFE8A0BF);
 
   static const Color darkPrimaryColor = Color(0xFF1A1625);
   static const Color darkSecondaryColor = Color(0xFF241F30);
@@ -29,6 +29,19 @@ class AppTheme {
     _currentBrightness = brightness;
   }
 
+  static void setAccentColor(Color color) {
+    accentColor = color;
+    // 生成对应的浅色版本
+    final hsl = HSLColor.fromColor(color);
+    accentLight = hsl.withLightness((hsl.lightness + 0.2).clamp(0.0, 1.0)).toColor();
+  }
+
+  static LinearGradient get accentGradient => LinearGradient(
+    colors: [accentColor, accentLight],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
   static Color get textPrimary =>
       _currentBrightness == Brightness.light ? lightTextPrimary : darkTextPrimary;
 
@@ -50,7 +63,7 @@ class AppTheme {
       brightness: Brightness.dark,
       primaryColor: accentColor,
       scaffoldBackgroundColor: darkSurfaceColor,
-      colorScheme: const ColorScheme.dark(
+      colorScheme: ColorScheme.dark(
         primary: accentColor,
         secondary: accentLight,
         surface: darkSurfaceColor,
@@ -67,7 +80,7 @@ class AppTheme {
         elevation: 2,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
-      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+      bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: darkPrimaryColor,
         selectedItemColor: accentColor,
         unselectedItemColor: darkTextSecondary,
@@ -97,7 +110,7 @@ class AppTheme {
         color: Color(0xFF352E45),
         thickness: 0.5,
       ),
-      floatingActionButtonTheme: const FloatingActionButtonThemeData(
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: accentColor,
         foregroundColor: Colors.white,
       ),
@@ -110,7 +123,7 @@ class AppTheme {
       brightness: Brightness.light,
       primaryColor: accentColor,
       scaffoldBackgroundColor: lightSurfaceColor,
-      colorScheme: const ColorScheme.light(
+      colorScheme: ColorScheme.light(
         primary: accentColor,
         secondary: accentLight,
         surface: lightSurfaceColor,
@@ -127,7 +140,7 @@ class AppTheme {
         elevation: 2,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
-      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+      bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: lightCardColor,
         selectedItemColor: accentColor,
         unselectedItemColor: lightTextSecondary,
@@ -157,7 +170,7 @@ class AppTheme {
         color: Color(0xFFD8D0E5),
         thickness: 0.5,
       ),
-      floatingActionButtonTheme: const FloatingActionButtonThemeData(
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: accentColor,
         foregroundColor: Colors.white,
       ),
@@ -167,6 +180,7 @@ class AppTheme {
 
 class ThemeService {
   static const String _keyThemeMode = 'theme_mode';
+  static const String _keyAccentColor = 'accent_color';
 
   static Future<AppThemeMode> getThemeMode() async {
     final prefs = await SharedPreferences.getInstance();
@@ -177,6 +191,20 @@ class ThemeService {
   static Future<void> setThemeMode(AppThemeMode mode) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_keyThemeMode, mode.index);
+  }
+
+  static Future<void> loadAccentColor() async {
+    final prefs = await SharedPreferences.getInstance();
+    final colorValue = prefs.getInt(_keyAccentColor);
+    if (colorValue != null) {
+      AppTheme.setAccentColor(Color(colorValue));
+    }
+  }
+
+  static Future<void> setAccentColor(Color color) async {
+    AppTheme.setAccentColor(color);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_keyAccentColor, color.value);
   }
 
   static ThemeData getTheme(AppThemeMode mode) {
