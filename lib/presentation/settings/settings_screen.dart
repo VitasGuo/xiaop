@@ -102,6 +102,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: 24),
           _buildSectionTitle('外观'),
           _buildThemeSelector(currentTheme),
+          const SizedBox(height: 8),
+          _buildAccentColorPicker(),
           const SizedBox(height: 24),
           _buildSectionTitle('关于'),
           _buildAboutButton(),
@@ -699,6 +701,62 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               setState(() {});
               TtsService().setSpeechRate(v);
             },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAccentColorPicker() {
+    final colors = [
+      {'name': '薰衣草紫', 'color': const Color(0xFF9B8EC4)},
+      {'name': '海洋蓝', 'color': const Color(0xFF5B9BD5)},
+      {'name': '森林绿', 'color': const Color(0xFF6BAF6D)},
+      {'name': '珊瑚红', 'color': const Color(0xFFE8735A)},
+      {'name': '琥珀橙', 'color': const Color(0xFFE8A44C)},
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.cardColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Theme.of(context).dividerColor, width: 0.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('主题色', style: TextStyle(fontSize: 14, color: AppTheme.textPrimary)),
+          const SizedBox(height: 4),
+          Text('选择后需要重启应用生效', style: TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: colors.map((c) {
+              return GestureDetector(
+                onTap: () async {
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setInt('accent_color', (c['color'] as Color).value);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('重启应用后生效')),
+                    );
+                  }
+                },
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: c['color'] as Color,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Theme.of(context).dividerColor,
+                      width: 2,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
           ),
         ],
       ),

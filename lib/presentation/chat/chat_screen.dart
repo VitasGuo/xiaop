@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dio/dio.dart';
 import 'package:xiao_p/utils/logger.dart';
@@ -334,6 +336,28 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     setState(() => _isListening = false);
   }
 
+  void _exportConversation() {
+    final buffer = StringBuffer();
+    buffer.writeln('# ${ref.read(companionProvider).name} - 对话记录');
+    buffer.writeln('导出时间: ${DateTime.now().toString().substring(0, 19)}');
+    buffer.writeln('');
+
+    for (final msg in _messages) {
+      final role = msg.role == 'user' ? '我' : ref.read(companionProvider).name;
+      final time = DateFormat('HH:mm').format(msg.timestamp);
+      buffer.writeln('**$role** ($time)');
+      buffer.writeln(msg.content);
+      buffer.writeln('');
+    }
+
+    Clipboard.setData(ClipboardData(text: buffer.toString()));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('对话已复制到剪贴板'), duration: Duration(seconds: 2)),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final companion = ref.watch(companionProvider);
@@ -349,6 +373,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         ),
         title: Text(companion.name),
         actions: [
+          if (_messages.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.ios_share, size: 20),
+              tooltip: '导出对话',
+              onPressed: _exportConversation,
+            ),
           IconButton(
             icon: Icon(
               _enableThinking ? Icons.psychology : Icons.psychology_outlined,
