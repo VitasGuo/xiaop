@@ -1,9 +1,13 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xiao_p/models/memory_entry.dart';
+import 'package:xiao_p/utils/logger.dart';
 
 class MemoryService {
   static Database? _database;
+  static const _keyLastConsolidation = 'memory_last_consolidation';
+  static const _consolidationInterval = Duration(hours: 6);
 
   static Future<Database> get database async {
     if (_database != null) return _database!;
@@ -283,5 +287,25 @@ class MemoryService {
       where: 'level = 4 AND updated_at < ?',
       whereArgs: [ninetyDaysAgo],
     );
+  }
+
+  /// 检查并执行定期整合（每6小时一次）
+  static Future<void> checkAndConsolidate() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final lastStr = prefs.getString(_keyLastConsolidation);
+      final lastTime = lastStr != null ? DateTime.tryParse(lastStr) : null;
+
+      if (lastTime != null && DateTime.now().difference(lastTime) < _consolidationInterval) {
+        return; // 还没到下次整合时间
+      }
+
+      Log.d('执行记忆整合...');
+      await consolidateMemories();
+      await prefs.setString(_keyLastConsolidation, DateTime.now().toIso8601String());
+      Log.d('记忆整合完成');
+    } catch (e) {
+      Log.w('记忆整合失败: $e');
+    }
   }
 }

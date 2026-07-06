@@ -94,6 +94,9 @@ class ChatService {
       final title = text.length > 20 ? '${text.substring(0, 20)}...' : text;
       await updateConversationTitle(conversationId, title);
     }
+
+    // 触发定期记忆整合
+    MemoryService.checkAndConsolidate();
   }
 
   Future<void> _saveConversations(List<Conversation> conversations) async {
