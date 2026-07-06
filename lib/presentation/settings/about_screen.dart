@@ -102,14 +102,18 @@ class _AboutScreenState extends State<AboutScreen> {
 
           // 功能特性
           _buildSection('功能特性', [
-            _buildFeatureItem('多AI提供商', '支持 LM Studio、DeepSeek、Qwen、Kimi、GLM 等'),
-            _buildFeatureItem('流式对话', 'AI回复逐字显示，体验更流畅'),
-            _buildFeatureItem('分层记忆', 'L0-L4 五层记忆系统，AI 自动提取整合'),
-            _buildFeatureItem('人格系统', '3种预设风格 + 无限自定义人格'),
-            _buildFeatureItem('对话管理', '多对话支持，置顶/重命名/删除'),
-            _buildFeatureItem('语音交互', '语音输入 + 语音朗读回复'),
-            _buildFeatureItem('联网搜索', '自动搜索相关信息辅助回答'),
-            _buildFeatureItem('深度记忆', 'AI 自动记忆用户偏好、情绪、习惯'),
+            _buildFeatureItem('多AI提供商', 'SenseNova(开箱即用) + LM Studio + DeepSeek + Qwen + Kimi + GLM + MiMo + 文心 + 混元 + 豆包 + 自定义'),
+            _buildFeatureItem('流式对话', 'SSE 流式输出，AI回复逐字显示'),
+            _buildFeatureItem('思考模式', '支持 reasoning/thinking，聊天气泡内折叠展示'),
+            _buildFeatureItem('分层记忆', 'L0-L4 五层记忆系统，SQLite 存储'),
+            _buildFeatureItem('人格系统', '3种预设风格 + 无限自定义人格，可绑定语音'),
+            _buildFeatureItem('对话管理', '多对话、置顶、重命名、搜索、滑动删除'),
+            _buildFeatureItem('语音交互', 'STT 语音输入 + TTS 语音朗读，可选音色和语速'),
+            _buildFeatureItem('联网搜索', 'DuckDuckGo 搜索，可开关'),
+            _buildFeatureItem('消息操作', '复制、重新生成'),
+            _buildFeatureItem('上下文长度', '可调节 2-50 条消息'),
+            _buildFeatureItem('欢迎引导', '首次打开 APP 引导页'),
+            _buildFeatureItem('连通测试', '设置页一键测试 AI 连接'),
           ]),
 
           const SizedBox(height: 24),

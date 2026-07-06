@@ -8,8 +8,9 @@ import 'package:intl/intl.dart';
 class ChatBubble extends StatelessWidget {
   final ChatMessage message;
   final VoidCallback? onRegenerate;
+  final VoidCallback? onDelete;
 
-  const ChatBubble({super.key, required this.message, this.onRegenerate});
+  const ChatBubble({super.key, required this.message, this.onRegenerate, this.onDelete});
 
   @override
   Widget build(BuildContext context) {
@@ -132,6 +133,15 @@ class ChatBubble extends StatelessWidget {
                 onTap: () {
                   Navigator.pop(ctx);
                   onRegenerate!();
+                },
+              ),
+            if (onDelete != null)
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: Colors.red),
+                title: const Text('删除', style: TextStyle(color: Colors.red)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  onDelete!();
                 },
               ),
           ],

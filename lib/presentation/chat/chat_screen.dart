@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dio/dio.dart';
 import 'package:xiao_p/core/theme.dart';
 import 'package:xiao_p/models/chat_message.dart';
@@ -24,6 +25,7 @@ class ChatScreen extends ConsumerStatefulWidget {
 }
 
 class _ChatScreenState extends ConsumerState<ChatScreen> {
+  static const _keyPrefix = 'chat_';
   final _chatController = TextEditingController();
   final _scrollController = ScrollController();
   List<ChatMessage> _messages = [];
@@ -249,6 +251,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     await _sendMessageInternal(lastUserMsg);
   }
 
+  void _deleteMessage(int index) {
+    setState(() {
+      _messages.removeAt(index);
+    });
+    // 异步保存更新后的消息列表
+    _saveMessages();
+  }
+
+  Future<void> _saveMessages() async {
+    final prefs = await SharedPreferences.getInstance();
+    final convId = widget.conversationId;
+    await prefs.setString('$_keyPrefix$convId', ChatMessage.encodeList(_messages));
+  }
+
   void _extractMemory(String userMessage, String aiResponse, AiConfig aiConfig) {
     // 简单的本地记忆提取（正则匹配）
     try {
@@ -427,6 +443,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               !_loading
               ? () => _regenerateLastMessage()
               : null,
+          onDelete: () => _deleteMessage(index),
         );
       },
     );

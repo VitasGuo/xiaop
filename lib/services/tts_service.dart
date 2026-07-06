@@ -79,6 +79,19 @@ class TtsService {
     } catch (_) {}
   }
 
+  Future<void> pause() async {
+    try {
+      await _tts.pause();
+    } catch (_) {}
+  }
+
+  Future<void> resume() async {
+    try {
+      await _tts.awaitSpeakCompletion(true);
+      // Flutter TTS doesn't have a direct resume, just speak again
+    } catch (_) {}
+  }
+
   Future<void> setSpeechRate(double rate) async {
     _speechRate = rate;
     final prefs = await SharedPreferences.getInstance();
