@@ -1,5 +1,6 @@
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:xiao_p/utils/logger.dart';
 
 class TtsService {
   static final TtsService _instance = TtsService._();
@@ -61,7 +62,8 @@ class TtsService {
               })
           .toList();
       return zhVoices;
-    } catch (_) {
+    } catch (e) {
+      Log.w('获取TTS语音列表失败: $e');
       return [];
     }
   }
@@ -70,26 +72,33 @@ class TtsService {
     if (!_enabled || text.isEmpty) return;
     try {
       await _tts.speak(text);
-    } catch (_) {}
+    } catch (e) {
+      Log.w('TTS朗读失败: $e');
+    }
   }
 
   Future<void> stop() async {
     try {
       await _tts.stop();
-    } catch (_) {}
+    } catch (e) {
+      Log.w('TTS停止失败: $e');
+    }
   }
 
   Future<void> pause() async {
     try {
       await _tts.pause();
-    } catch (_) {}
+    } catch (e) {
+      Log.w('TTS暂停失败: $e');
+    }
   }
 
   Future<void> resume() async {
     try {
       await _tts.awaitSpeakCompletion(true);
-      // Flutter TTS doesn't have a direct resume, just speak again
-    } catch (_) {}
+    } catch (e) {
+      Log.w('TTS恢复失败: $e');
+    }
   }
 
   Future<void> setSpeechRate(double rate) async {

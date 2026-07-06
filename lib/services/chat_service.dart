@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xiao_p/core/dio_client.dart';
 import 'package:xiao_p/models/chat_message.dart';
 import 'package:xiao_p/models/companion.dart';
+import 'package:xiao_p/utils/logger.dart';
 import 'package:xiao_p/models/conversation.dart';
 import 'package:xiao_p/services/ai_providers.dart';
 import 'package:xiao_p/services/api_key_service.dart';
@@ -198,7 +199,9 @@ class ChatService {
           const Duration(seconds: 5),
           onTimeout: () => '',
         );
-      } catch (_) {}
+      } catch (e) {
+        Log.w('联网搜索失败: $e');
+      }
     }
 
     final systemPrompt = StringBuffer();
@@ -285,7 +288,9 @@ class ChatService {
                     }
                   }
                 }
-              } catch (_) {}
+              } catch (e) {
+                Log.w('SSE解析异常: $e');
+              }
             }
           }
         }
@@ -407,7 +412,9 @@ importance: 1-5（1=琐碎，5=核心信息）
         final content = response.data['choices'][0]['message']['content'] as String;
         _parseAndSaveExtractedMemories(content);
       }
-    } catch (_) {}
+    } catch (e) {
+      Log.w('AI记忆提取失败: $e');
+    }
   }
 
   void _parseAndSaveExtractedMemories(String content) async {
@@ -428,6 +435,8 @@ importance: 1-5（1=琐碎，5=核心信息）
 
         await MemoryService.upsertMemory(category, key, value, importance: importance);
       }
-    } catch (_) {}
+    } catch (e) {
+      Log.w('解析AI记忆失败: $e');
+    }
   }
 }

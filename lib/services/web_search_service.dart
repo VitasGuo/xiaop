@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:xiao_p/utils/logger.dart';
 
 class WebSearchService {
   static final WebSearchService _instance = WebSearchService._();
@@ -10,10 +11,12 @@ class WebSearchService {
   Future<String> search(String query, {int maxResults = 5}) async {
     try {
       return await _searchDuckDuckGo(query, maxResults);
-    } catch (_) {
+    } catch (e) {
+      Log.w('DuckDuckGo搜索失败: $e');
       try {
         return await _searchLite(query, maxResults);
-      } catch (e) {
+      } catch (e2) {
+        Log.w('Lite搜索也失败: $e2');
         return '';
       }
     }

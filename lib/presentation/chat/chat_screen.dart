@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dio/dio.dart';
+import 'package:xiao_p/utils/logger.dart';
 import 'package:xiao_p/core/theme.dart';
 import 'package:xiao_p/models/chat_message.dart';
 import 'package:xiao_p/providers/ai_config_provider.dart';
@@ -308,7 +309,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       if (likeMatch != null) {
         MemoryService.upsertMemory('user_preference', '喜欢 ${likeMatch.group(1)}', '用户提到喜欢${likeMatch.group(1)}', importance: 2);
       }
-    } catch (_) {}
+    } catch (e) {
+      Log.w('正则记忆提取失败: $e');
+    }
   }
 
   void _startVoiceInput() async {
