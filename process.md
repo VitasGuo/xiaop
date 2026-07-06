@@ -1,10 +1,13 @@
 # 小P 进度
 
-## 当前版本: v1.1.0
+## 当前版本: v1.1.1
 
 ## 版本历史
 
-### v1.1.0 (2026-07-06)
+### v1.1.1 (2026-07-06)
+- 修复消息保存兜底：conversationId 提前捕获，防止 dispose 后 widget 无效导致消息丢失
+- SenseNova 提供商重新添加（git checkout 回退后补回）
+- 功能完成度评估：综合 80%，已识别 12 个改善方向
 - 内置 SenseNova 开箱即用（预置 API Key，deepseek-v4-flash）
 - 默认提供商改为 SenseNova，无需配置即可对话
 - 代码清理：删除死代码（voice_chat_screen 454行 + memory_extractor 245行）

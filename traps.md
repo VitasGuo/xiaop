@@ -29,3 +29,13 @@
 - **现象**: LM Studio 用 `http://` 被系统拦截
 - **根因**: Android 9+ 默认 `cleartextTrafficPermitted=false`
 - **解决**: 添加 `res/xml/network_security_config.xml`，AndroidManifest 引用
+
+## #7 消息保存丢失
+- **现象**: 对话列表有记录但进入后看不到消息内容
+- **根因**: 流式 onComplete 回调中用 `widget.conversationId`，widget dispose 后引用无效导致保存静默失败
+- **解决**: 流式开始前用 `final convId = widget.conversationId` 提前捕获，回调中用 `convId`
+
+## #8 PowerShell 替换破坏 UTF-8 文件
+- **现象**: 用 PowerShell `-replace` 替换中文字符串后文件乱码，Flutter 编译报错
+- **根因**: PowerShell 的 `-replace` 运算符对 Unicode 处理有问题，会截断多字节字符
+- **解决**: 用 Dart/Flutter 的 edit 工具逐文件替换，不要用 PowerShell 批量替换含中文的代码文件
