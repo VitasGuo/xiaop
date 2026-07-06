@@ -321,4 +321,113 @@ class ChatService {
     }
   }
 
+  // ==================== AI 记忆提取 ====================
+
+  Future<void> extractMemoryWithAI({
+    required String userMessage,
+    required String aiResponse,
+    required String providerName,
+    required String modelName,
+    String? customUrl,
+  }) async {
+    try {
+      final provider = AiProviders.getByName(providerName);
+      if (provider == null) return;
+
+      final baseUrl = customUrl?.isNotEmpty == true
+          ? customUrl!
+          : provider.defaultBaseUrl;
+      if (baseUrl.isEmpty) return;
+
+      String? apiKey;
+      if (provider.hasPresetKey) {
+        apiKey = provider.presetApiKey;
+      } else if (provider.needsApiKey) {
+        apiKey = await ApiKeyService.getEffectiveApiKey(provider);
+      }
+
+      final existingMemories = await MemoryService.buildMemoryContext('');
+
+      final prompt = '''你是一个记忆提取助手。分析以下对话，提取值得长期记住的信息。
+
+用户说：$userMessage
+AI回复：$aiResponse
+
+已有记忆：
+$existingMemories
+
+请提取以下类型的信息（JSON数组格式，每条包含 category、key、value、importance）：
+- category: "fact" - 用户的基本事实（名字、职业、年龄、家庭、住址等）
+- category: "user_preference" - 用户的喜好（喜欢/讨厌什么、偏好）
+- category: "emotion" - 用户的情绪状态
+- category: "important_event" - 重要事件
+- category: "habit" - 用户的日常习惯
+- category: "relationship" - 用户提到的人际关系
+
+importance: 1-5（1=琐碎，5=核心信息）
+
+规则：
+1. 只提取明确提到的信息，不要猜测
+2. 如果已有相同信息，不要重复
+3. 如果信息有更新，覆盖旧信息
+4. 每次最多提取3条最重要的信息
+5. 无信息可提取时输出空数组 []
+6. 必须输出合法的JSON数组
+
+输出格式：
+[{"category":"fact","key":"用户名字","value":"小明","importance":3}]''';
+
+      final dio = createDio(
+        connectTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 30),
+      );
+
+      final headers = <String, String>{
+        'Content-Type': 'application/json',
+      };
+      if (apiKey != null && apiKey.isNotEmpty) {
+        headers['Authorization'] = 'Bearer $apiKey';
+      }
+
+      final response = await dio.post(
+        '$baseUrl/chat/completions',
+        options: Options(headers: headers),
+        data: {
+          if (modelName.isNotEmpty) 'model': modelName,
+          'messages': [
+            {'role': 'system', 'content': '你是一个记忆提取助手，只输出JSON数组。'},
+            {'role': 'user', 'content': prompt},
+          ],
+          'temperature': 0.1,
+          'max_tokens': 512,
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final content = response.data['choices'][0]['message']['content'] as String;
+        _parseAndSaveExtractedMemories(content);
+      }
+    } catch (_) {}
+  }
+
+  void _parseAndSaveExtractedMemories(String content) async {
+    try {
+      String jsonStr = content.trim();
+      if (jsonStr.startsWith('```json')) jsonStr = jsonStr.substring(7);
+      if (jsonStr.startsWith('```')) jsonStr = jsonStr.substring(3);
+      if (jsonStr.endsWith('```')) jsonStr = jsonStr.substring(0, jsonStr.length - 3);
+      jsonStr = jsonStr.trim();
+
+      final List<dynamic> memories = jsonDecode(jsonStr);
+      for (final item in memories) {
+        final map = item as Map<String, dynamic>;
+        final category = map['category'] as String;
+        final key = map['key'] as String;
+        final value = map['value'] as String;
+        final importance = (map['importance'] as num?)?.toInt() ?? 2;
+
+        await MemoryService.upsertMemory(category, key, value, importance: importance);
+      }
+    } catch (_) {}
+  }
 }

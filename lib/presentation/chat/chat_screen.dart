@@ -266,7 +266,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   void _extractMemory(String userMessage, String aiResponse, AiConfig aiConfig) {
-    // 简单的本地记忆提取（正则匹配）
+    // AI 记忆提取（异步，不阻塞 UI）
+    _chatService.extractMemoryWithAI(
+      userMessage: userMessage,
+      aiResponse: aiResponse,
+      providerName: aiConfig.provider,
+      modelName: aiConfig.model,
+      customUrl: aiConfig.customUrl.isNotEmpty ? aiConfig.customUrl : null,
+    );
+
+    // 同时保留基础正则提取作为兜底
     try {
       final namePatterns = [
         RegExp(r'我叫(.{1,10})', caseSensitive: false),
