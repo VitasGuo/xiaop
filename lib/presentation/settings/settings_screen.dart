@@ -398,7 +398,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             Expanded(
               child: Text('关于小P', style: TextStyle(fontSize: 14, color: AppTheme.textPrimary)),
             ),
-            Text('v1.0.0', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+            Text('v1.2.5', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
             const SizedBox(width: 4),
             Icon(Icons.chevron_right, color: AppTheme.textSecondary, size: 18),
           ],
