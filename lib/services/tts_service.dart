@@ -9,18 +9,22 @@ class TtsService {
   final FlutterTts _tts = FlutterTts();
   bool _enabled = true;
   String _voiceName = '';
+  double _speechRate = 0.5;
   static const _keyTtsEnabled = 'tts_enabled';
   static const _keyTtsVoice = 'tts_voice';
+  static const _keyTtsRate = 'tts_rate';
 
   bool get isEnabled => _enabled;
   String get voiceName => _voiceName;
+  double get speechRate => _speechRate;
 
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
     _enabled = prefs.getBool(_keyTtsEnabled) ?? true;
     _voiceName = prefs.getString(_keyTtsVoice) ?? '';
+    _speechRate = prefs.getDouble(_keyTtsRate) ?? 0.5;
     await _tts.setLanguage('zh-CN');
-    await _tts.setSpeechRate(0.5);
+    await _tts.setSpeechRate(_speechRate);
     await _tts.setVolume(1.0);
     await _tts.setPitch(1.0);
     if (_voiceName.isNotEmpty) {
@@ -76,6 +80,9 @@ class TtsService {
   }
 
   Future<void> setSpeechRate(double rate) async {
+    _speechRate = rate;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(_keyTtsRate, rate);
     await _tts.setSpeechRate(rate);
   }
 }

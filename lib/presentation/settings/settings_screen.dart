@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dio/dio.dart';
 import 'package:xiao_p/core/theme.dart';
 import 'package:xiao_p/main.dart';
@@ -18,6 +19,7 @@ class SettingsScreen extends ConsumerStatefulWidget {
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _ttsEnabled = true;
+  bool _webSearchEnabled = true;
   final TextEditingController _apiKeyController = TextEditingController();
   final TextEditingController _modelController = TextEditingController();
   final TextEditingController _urlController = TextEditingController();
@@ -41,9 +43,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final tts = TtsService();
     final aiConfig = ref.read(aiConfigProvider);
     final apiKey = await ApiKeyService.getApiKey(aiConfig.provider);
+    final prefs = await SharedPreferences.getInstance();
     if (mounted) {
       setState(() {
         _ttsEnabled = tts.isEnabled;
+        _webSearchEnabled = prefs.getBool('web_search_enabled') ?? true;
         _apiKeyController.text = apiKey ?? '';
         _modelController.text = aiConfig.effectiveModel;
         _urlController.text = aiConfig.effectiveUrl;
@@ -84,12 +88,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           _buildTestButton(aiConfig),
           const SizedBox(height: 16),
           _buildContextLengthSlider(aiConfig),
+          const SizedBox(height: 8),
+          _buildWebSearchToggle(),
           const SizedBox(height: 24),
           _buildSectionTitle('语音设置'),
           _buildTtsToggle(),
           if (_ttsEnabled) ...[
             const SizedBox(height: 8),
             _buildVoiceSelector(),
+            const SizedBox(height: 8),
+            _buildSpeechRateSlider(),
           ],
           const SizedBox(height: 24),
           _buildSectionTitle('外观'),
@@ -575,6 +583,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
+  Widget _buildWebSearchToggle() {
+    return SwitchListTile(
+      title: Text('联网搜索', style: TextStyle(color: AppTheme.textPrimary)),
+      subtitle: Text('对话时自动搜索相关信息',
+          style: TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
+      value: _webSearchEnabled,
+      onChanged: (value) async {
+        setState(() => _webSearchEnabled = value);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('web_search_enabled', value);
+      },
+      thumbColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) return AppTheme.accentColor;
+        return null;
+      }),
+      contentPadding: EdgeInsets.zero,
+    );
+  }
+
   Widget _buildTtsToggle() {
     return SwitchListTile(
       title: Text(
@@ -639,6 +666,42 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildSpeechRateSlider() {
+    final rate = TtsService().speechRate;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.cardColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Theme.of(context).dividerColor, width: 0.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('语速', style: TextStyle(fontSize: 14, color: AppTheme.textPrimary)),
+              Text('${rate.toStringAsFixed(1)}x', style: TextStyle(
+                fontSize: 12, color: AppTheme.accentColor, fontWeight: FontWeight.w600)),
+            ],
+          ),
+          Slider(
+            value: rate.clamp(0.1, 2.0),
+            min: 0.1,
+            max: 2.0,
+            divisions: 19,
+            activeColor: AppTheme.accentColor,
+            onChanged: (v) {
+              setState(() {});
+              TtsService().setSpeechRate(v);
+            },
+          ),
+        ],
+      ),
     );
   }
 

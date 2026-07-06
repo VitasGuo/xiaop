@@ -7,8 +7,9 @@ import 'package:intl/intl.dart';
 
 class ChatBubble extends StatelessWidget {
   final ChatMessage message;
+  final VoidCallback? onRegenerate;
 
-  const ChatBubble({super.key, required this.message});
+  const ChatBubble({super.key, required this.message, this.onRegenerate});
 
   @override
   Widget build(BuildContext context) {
@@ -82,15 +83,15 @@ class ChatBubble extends StatelessWidget {
   Widget _buildAssistantContent(BuildContext context) {
     final content = message.content;
 
-    // 检测 <think>...</think> 标签
     final thinkingRegex = RegExp(r'<think>([\s\S]*?)</think>', dotAll: true);
     final thinkingMatch = thinkingRegex.firstMatch(content);
 
+    Widget contentWidget;
     if (thinkingMatch != null) {
       final thinkingText = thinkingMatch.group(1) ?? '';
       final afterThinking = content.substring(thinkingMatch.end).trim();
 
-      return Column(
+      contentWidget = Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (thinkingText.isNotEmpty)
@@ -99,9 +100,44 @@ class ChatBubble extends StatelessWidget {
             _buildMarkdownContent(afterThinking),
         ],
       );
+    } else {
+      contentWidget = _buildMarkdownContent(content);
     }
 
-    return _buildMarkdownContent(content);
+    return GestureDetector(
+      onLongPress: () => _showContextMenu(context),
+      child: contentWidget,
+    );
+  }
+
+  void _showContextMenu(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.copy),
+              title: const Text('复制'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _copyMessage(context);
+              },
+            ),
+            if (onRegenerate != null)
+              ListTile(
+                leading: const Icon(Icons.refresh),
+                title: const Text('重新生成'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  onRegenerate!();
+                },
+              ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildMarkdownContent(String text) {

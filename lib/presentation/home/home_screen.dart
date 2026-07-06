@@ -40,14 +40,6 @@ class HomeScreen extends ConsumerWidget {
               const Spacer(),
               _buildActionCard(
                 context,
-                icon: Icons.chat_bubble_outline,
-                title: '开始聊天',
-                subtitle: '和${companion.name}聊聊天吧',
-                onTap: () => context.push('/conversations'),
-              ),
-              const SizedBox(height: 12),
-              _buildActionCard(
-                context,
                 icon: Icons.psychology_outlined,
                 title: '人格设置',
                 subtitle: '自定义${companion.name}的性格',

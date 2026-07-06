@@ -236,6 +236,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     await _sendMessageInternal(_lastUserMessage!);
   }
 
+  Future<void> _regenerateLastMessage() async {
+    if (_loading || _messages.isEmpty) return;
+    // 找到最后一条用户消息
+    final lastUserIdx = _messages.lastIndexWhere((m) => m.role == 'user');
+    if (lastUserIdx == -1) return;
+    final lastUserMsg = _messages[lastUserIdx].content;
+    // 删除最后一条 AI 消息
+    setState(() {
+      _messages.removeRange(lastUserIdx + 1, _messages.length);
+    });
+    await _sendMessageInternal(lastUserMsg);
+  }
+
   void _extractMemory(String userMessage, String aiResponse, AiConfig aiConfig) {
     // 简单的本地记忆提取（正则匹配）
     try {
@@ -407,7 +420,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         if (index == _messages.length && _loading) {
           return _buildTypingIndicator();
         }
-        return ChatBubble(message: _messages[index]);
+        return ChatBubble(
+          message: _messages[index],
+          onRegenerate: _messages[index].role == 'assistant' &&
+              index == _messages.length - 1 &&
+              !_loading
+              ? () => _regenerateLastMessage()
+              : null,
+        );
       },
     );
   }

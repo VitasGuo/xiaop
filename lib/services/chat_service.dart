@@ -187,15 +187,19 @@ class ChatService {
 
     final memoryContext = await MemoryService.buildMemoryContext(userMessage);
 
-    // 联网搜索 - 仅对可能需要搜索的问题执行，且并行不阻塞
+    // 联网搜索 - 根据设置开关决定是否执行
     String searchContext = '';
-    try {
-      final searchService = WebSearchService();
-      searchContext = await searchService.search(userMessage).timeout(
-        const Duration(seconds: 5),
-        onTimeout: () => '',
-      );
-    } catch (_) {}
+    final prefs = await SharedPreferences.getInstance();
+    final webSearchEnabled = prefs.getBool('web_search_enabled') ?? true;
+    if (webSearchEnabled) {
+      try {
+        final searchService = WebSearchService();
+        searchContext = await searchService.search(userMessage).timeout(
+          const Duration(seconds: 5),
+          onTimeout: () => '',
+        );
+      } catch (_) {}
+    }
 
     final systemPrompt = StringBuffer();
     systemPrompt.writeln(companion.systemPrompt);

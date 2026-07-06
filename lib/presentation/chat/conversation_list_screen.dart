@@ -16,6 +16,9 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
   final ChatService _chatService = ChatService();
   List<Conversation> _conversations = [];
   bool _loading = true;
+  bool _showSearch = false;
+  String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
@@ -86,7 +89,35 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('对话历史')),
+      appBar: AppBar(
+        title: _showSearch
+            ? TextField(
+                controller: _searchController,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: '搜索对话...',
+                  hintStyle: TextStyle(color: AppTheme.textSecondary),
+                  border: InputBorder.none,
+                ),
+                style: TextStyle(color: AppTheme.textPrimary),
+                onChanged: (v) => setState(() => _searchQuery = v),
+              )
+            : const Text('对话历史'),
+        actions: [
+          IconButton(
+            icon: Icon(_showSearch ? Icons.close : Icons.search, size: 20),
+            onPressed: () {
+              setState(() {
+                _showSearch = !_showSearch;
+                if (!_showSearch) {
+                  _searchQuery = '';
+                  _searchController.clear();
+                }
+              });
+            },
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: _createConversation,
         backgroundColor: AppTheme.accentColor,
@@ -94,9 +125,7 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : _conversations.isEmpty
-              ? _buildEmptyState()
-              : _buildConversationList(),
+          : _buildConversationList(),
     );
   }
 
@@ -118,10 +147,25 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
   }
 
   Widget _buildConversationList() {
+    final filtered = _searchQuery.isEmpty
+        ? _conversations
+        : _conversations
+            .where((c) => c.title.toLowerCase().contains(_searchQuery.toLowerCase()))
+            .toList();
+
+    if (filtered.isEmpty) {
+      return Center(
+        child: Text(
+          _searchQuery.isEmpty ? '还没有对话' : '没有匹配的对话',
+          style: TextStyle(fontSize: 16, color: AppTheme.textSecondary),
+        ),
+      );
+    }
+
     return ListView.builder(
       padding: const EdgeInsets.all(16),
-      itemCount: _conversations.length,
-      itemBuilder: (context, index) => _buildConversationItem(_conversations[index]),
+      itemCount: filtered.length,
+      itemBuilder: (context, index) => _buildConversationItem(filtered[index]),
     );
   }
 
