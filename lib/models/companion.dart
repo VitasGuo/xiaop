@@ -8,6 +8,7 @@ class Companion {
   final String systemPrompt;
   final CompanionPreset preset;
   final String? avatarUrl;
+  final String voiceName;
 
   const Companion({
     required this.name,
@@ -15,6 +16,7 @@ class Companion {
     required this.systemPrompt,
     this.preset = CompanionPreset.warm,
     this.avatarUrl,
+    this.voiceName = '',
   });
 
   Map<String, dynamic> toJson() => {
@@ -23,6 +25,7 @@ class Companion {
         'systemPrompt': systemPrompt,
         'preset': preset.name,
         'avatarUrl': avatarUrl ?? '',
+        'voiceName': voiceName,
       };
 
   factory Companion.fromJson(Map<String, dynamic> json) => Companion(
@@ -36,6 +39,7 @@ class Companion {
         avatarUrl: (json['avatarUrl'] as String?)?.isEmpty == true
             ? null
             : json['avatarUrl'] as String?,
+        voiceName: json['voiceName'] as String? ?? '',
       );
 
   static String encode(Companion c) => jsonEncode(c.toJson());

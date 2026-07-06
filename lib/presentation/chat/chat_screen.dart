@@ -163,8 +163,25 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           }
         },
         onComplete: (fullText) async {
-          // 保存完整消息到数据库
+          // 用完整文本强制更新UI（解决节流导致的最后一批token未显示）
           final finalContent = fullText.isNotEmpty ? fullText : buffer.toString();
+          if (mounted && !_disposed) {
+            setState(() {
+              final idx = _messages.indexWhere((m) => m.id == aiMsgId);
+              if (idx != -1) {
+                _messages[idx] = ChatMessage(
+                  id: aiMsgId,
+                  role: 'assistant',
+                  content: finalContent,
+                  timestamp: DateTime.now(),
+                );
+              }
+              _loading = false;
+            });
+            _scrollToBottom();
+          }
+
+          // 保存完整消息到数据库
           final finalMsg = ChatMessage(
             id: aiMsgId,
             role: 'assistant',
@@ -181,6 +198,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             setState(() {
               _loading = false;
             });
+            // 使用人格绑定的语音
+            if (companion.voiceName.isNotEmpty) {
+              _ttsService.setVoice(companion.voiceName);
+            }
             _ttsService.speak(finalMsg.content);
           }
         },

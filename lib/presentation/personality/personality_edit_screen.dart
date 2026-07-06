@@ -4,6 +4,7 @@ import 'package:xiao_p/core/theme.dart';
 import 'package:xiao_p/models/companion.dart';
 import 'package:xiao_p/providers/companion_providers.dart';
 import 'package:xiao_p/services/personality_service.dart';
+import 'package:xiao_p/services/tts_service.dart';
 
 class PersonalityEditScreen extends ConsumerStatefulWidget {
   final Companion? existing;
@@ -19,6 +20,7 @@ class _PersonalityEditScreenState extends ConsumerState<PersonalityEditScreen> {
   late TextEditingController _nameController;
   late TextEditingController _descController;
   late TextEditingController _promptController;
+  String _voiceName = '';
 
   @override
   void initState() {
@@ -27,6 +29,7 @@ class _PersonalityEditScreenState extends ConsumerState<PersonalityEditScreen> {
     _nameController = TextEditingController(text: companion?.name ?? '');
     _descController = TextEditingController(text: companion?.description ?? '');
     _promptController = TextEditingController(text: companion?.systemPrompt ?? '');
+    _voiceName = companion?.voiceName ?? '';
   }
 
   @override
@@ -54,6 +57,7 @@ class _PersonalityEditScreenState extends ConsumerState<PersonalityEditScreen> {
       description: desc,
       systemPrompt: prompt,
       preset: CompanionPreset.custom,
+      voiceName: _voiceName,
     );
 
     await PersonalityService.saveCompanion(companion);
@@ -94,6 +98,10 @@ class _PersonalityEditScreenState extends ConsumerState<PersonalityEditScreen> {
               style: TextStyle(color: AppTheme.textPrimary),
             ),
             const SizedBox(height: 20),
+            Text('语音音色', style: _labelStyle),
+            const SizedBox(height: 8),
+            _buildVoiceDropdown(),
+            const SizedBox(height: 20),
             Text('性格描述', style: _labelStyle),
             const SizedBox(height: 8),
             TextField(
@@ -122,6 +130,43 @@ class _PersonalityEditScreenState extends ConsumerState<PersonalityEditScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildVoiceDropdown() {
+    return FutureBuilder<List<Map<String, String>>>(
+      future: TtsService().getAvailableVoices(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return Text('暂无可用语音', style: TextStyle(color: AppTheme.textSecondary, fontSize: 13));
+        }
+        final voices = snapshot.data!;
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: AppTheme.primaryColor,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: voices.any((v) => v['name'] == _voiceName) ? _voiceName : null,
+              isExpanded: true,
+              hint: Text('选择语音音色', style: TextStyle(color: AppTheme.textSecondary)),
+              dropdownColor: AppTheme.cardColor,
+              style: TextStyle(color: AppTheme.textPrimary, fontSize: 13),
+              items: voices.map((v) {
+                return DropdownMenuItem(
+                  value: v['name'],
+                  child: Text(v['name'] ?? '', style: const TextStyle(fontSize: 13)),
+                );
+              }).toList(),
+              onChanged: (value) {
+                setState(() => _voiceName = value ?? '');
+              },
+            ),
+          ),
+        );
+      },
     );
   }
 

@@ -249,7 +249,7 @@ class ChatService {
           'temperature': 0.7,
           'max_tokens': 4096,
           'stream': true,
-          if (enableThinking) 'thinking': {'type': 'enabled'},
+          if (enableThinking) 'reasoning': {'effort': 'high'},
         },
       );
 

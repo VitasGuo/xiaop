@@ -87,6 +87,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: 24),
           _buildSectionTitle('语音设置'),
           _buildTtsToggle(),
+          if (_ttsEnabled) ...[
+            const SizedBox(height: 8),
+            _buildVoiceSelector(),
+          ],
           const SizedBox(height: 24),
           _buildSectionTitle('外观'),
           _buildThemeSelector(currentTheme),
@@ -593,6 +597,48 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         return null;
       }),
       contentPadding: EdgeInsets.zero,
+    );
+  }
+
+  Widget _buildVoiceSelector() {
+    return FutureBuilder<List<Map<String, String>>>(
+      future: TtsService().getAvailableVoices(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const SizedBox.shrink();
+        }
+        final voices = snapshot.data!;
+        final currentVoice = TtsService().voiceName;
+
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: AppTheme.cardColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Theme.of(context).dividerColor, width: 0.5),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: voices.any((v) => v['name'] == currentVoice) ? currentVoice : null,
+              isExpanded: true,
+              hint: Text('选择语音', style: TextStyle(color: AppTheme.textSecondary)),
+              dropdownColor: AppTheme.cardColor,
+              style: TextStyle(color: AppTheme.textPrimary),
+              items: voices.map((v) {
+                return DropdownMenuItem(
+                  value: v['name'],
+                  child: Text('${v['name']} (${v['locale']})', style: const TextStyle(fontSize: 13)),
+                );
+              }).toList(),
+              onChanged: (value) {
+                if (value != null) {
+                  TtsService().setVoice(value);
+                }
+              },
+            ),
+          ),
+        );
+      },
     );
   }
 

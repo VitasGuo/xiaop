@@ -324,59 +324,61 @@ class _MemoryScreenState extends State<MemoryScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(ctx).viewInsets.bottom + 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('添加记忆', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
-            const SizedBox(height: 16),
-            TextField(controller: keyController, decoration: InputDecoration(hintText: '键名（如：用户名字）')),
-            const SizedBox(height: 8),
-            TextField(controller: valueController, decoration: InputDecoration(hintText: '内容'), maxLines: 2),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Text('重要性: ', style: TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
-                ...List.generate(5, (i) => GestureDetector(
-                  onTap: () => setState(() => importance = i + 1),
-                  child: Container(
-                    margin: const EdgeInsets.only(right: 4),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: importance == i + 1 ? AppTheme.accentColor : AppTheme.cardColor,
-                      borderRadius: BorderRadius.circular(6),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) => Padding(
+          padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(ctx).viewInsets.bottom + 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('添加记忆', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
+              const SizedBox(height: 16),
+              TextField(controller: keyController, decoration: InputDecoration(hintText: '键名（如：用户名字）')),
+              const SizedBox(height: 8),
+              TextField(controller: valueController, decoration: InputDecoration(hintText: '内容'), maxLines: 2),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Text('重要性: ', style: TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
+                  ...List.generate(5, (i) => GestureDetector(
+                    onTap: () => setModalState(() => importance = i + 1),
+                    child: Container(
+                      margin: const EdgeInsets.only(right: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: importance == i + 1 ? AppTheme.accentColor : AppTheme.cardColor,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text('${i + 1}', style: TextStyle(
+                        fontSize: 12,
+                        color: importance == i + 1 ? Colors.white : AppTheme.textPrimary,
+                      )),
                     ),
-                    child: Text('${i + 1}', style: TextStyle(
-                      fontSize: 12,
-                      color: importance == i + 1 ? Colors.white : AppTheme.textPrimary,
-                    )),
-                  ),
-                )),
-              ],
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () async {
-                  if (keyController.text.isNotEmpty && valueController.text.isNotEmpty) {
-                    await MemoryService.upsertMemory(
-                      categoryController.text,
-                      keyController.text.trim(),
-                      valueController.text.trim(),
-                      importance: importance,
-                    );
-                    Navigator.pop(ctx);
-                    await _loadMemories();
-                  }
-                },
-                style: ElevatedButton.styleFrom(backgroundColor: AppTheme.accentColor),
-                child: const Text('保存', style: TextStyle(color: Colors.white)),
+                  )),
+                ],
               ),
-            ),
-          ],
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    if (keyController.text.isNotEmpty && valueController.text.isNotEmpty) {
+                      await MemoryService.upsertMemory(
+                        categoryController.text,
+                        keyController.text.trim(),
+                        valueController.text.trim(),
+                        importance: importance,
+                      );
+                      Navigator.pop(ctx);
+                      await _loadMemories();
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(backgroundColor: AppTheme.accentColor),
+                  child: const Text('保存', style: TextStyle(color: Colors.white)),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -1,3 +1,4 @@
+import 'package:permission_handler/permission_handler.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
 
@@ -16,6 +17,19 @@ class SttService {
 
   Future<bool> init() async {
     if (_initialized) return _hasPermission;
+
+    // 请求麦克风权限
+    var status = await Permission.microphone.status;
+    if (!status.isGranted) {
+      status = await Permission.microphone.request();
+    }
+    _hasPermission = status.isGranted;
+
+    if (!_hasPermission) {
+      _initialized = true;
+      return false;
+    }
+
     _hasPermission = await _speech.initialize(
       onError: (error) {
         _listening = false;

@@ -33,7 +33,6 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
     final conversations = await _chatService.getConversations();
     if (mounted) {
       setState(() {
-        // 置顶的排前面，然后按更新时间排序
         _conversations = List.from(conversations)
           ..sort((a, b) {
             if (a.isPinned && !b.isPinned) return -1;
@@ -53,29 +52,9 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
     }
   }
 
-  Future<void> _deleteConversation(Conversation conversation) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('删除对话'),
-        content: Text('确定删除「${conversation.title}」？'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('取消')),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red, foregroundColor: Colors.white),
-            child: const Text('删除'),
-          ),
-        ],
-      ),
-    );
-    if (confirm == true) {
-      await _chatService.deleteConversation(conversation.id);
-      await _loadConversations();
-    }
+  void _deleteConversation(Conversation conversation) async {
+    await _chatService.deleteConversation(conversation.id);
+    _loadConversations();
   }
 
   Future<void> _renameConversation(Conversation conversation) async {
@@ -83,15 +62,14 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
     final newTitle = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('重命名对话'),
+        title: const Text('重命名'),
         content: TextField(
           controller: controller,
           decoration: const InputDecoration(hintText: '输入新名称'),
           autofocus: true,
         ),
         actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
           TextButton(
             onPressed: () => Navigator.pop(ctx, controller.text.trim()),
             child: const Text('确定'),
@@ -143,10 +121,7 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: _conversations.length,
-      itemBuilder: (context, index) {
-        final conversation = _conversations[index];
-        return _buildConversationItem(conversation);
-      },
+      itemBuilder: (context, index) => _buildConversationItem(_conversations[index]),
     );
   }
 
@@ -158,12 +133,16 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
       direction: DismissDirection.endToStart,
       background: Container(
         alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 16),
-        color: Colors.red,
-        child: const Icon(Icons.delete, color: Colors.white),
+        padding: const EdgeInsets.only(right: 20),
+        margin: const EdgeInsets.only(bottom: 8),
+        decoration: BoxDecoration(
+          color: Colors.red,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Icon(Icons.delete_outline, color: Colors.white, size: 22),
       ),
       confirmDismiss: (_) async {
-        await _deleteConversation(conversation);
+        _deleteConversation(conversation);
         return false;
       },
       child: GestureDetector(
@@ -171,7 +150,7 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
           await context.push('/chat/${conversation.id}');
           _loadConversations();
         },
-        onLongPress: () => _showOptions(conversation),
+        onLongPress: () => _renameConversation(conversation),
         child: Container(
           margin: const EdgeInsets.only(bottom: 8),
           padding: const EdgeInsets.all(14),
@@ -189,12 +168,11 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
             children: [
               if (conversation.isPinned)
                 Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: Icon(Icons.push_pin, size: 14, color: AppTheme.accentColor),
+                  padding: const EdgeInsets.only(right: 6),
+                  child: Icon(Icons.push_pin, size: 13, color: AppTheme.accentColor),
                 ),
               Container(
-                width: 36,
-                height: 36,
+                width: 36, height: 36,
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
                     colors: [Color(0xFF9B8EC4), Color(0xFFE8A0BF)],
@@ -217,45 +195,24 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right, color: AppTheme.textSecondary, size: 18),
+              // 置顶按钮
+              GestureDetector(
+                onTap: () async {
+                  await _chatService.togglePin(conversation.id);
+                  _loadConversations();
+                },
+                child: Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: Icon(
+                    conversation.isPinned ? Icons.push_pin : Icons.push_pin_outlined,
+                    size: 18,
+                    color: conversation.isPinned ? AppTheme.accentColor : AppTheme.textSecondary.withValues(alpha: 0.5),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  void _showOptions(Conversation conversation) {
-    showModalBottomSheet(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          ListTile(
-            leading: Icon(conversation.isPinned ? Icons.push_pin_outlined : Icons.push_pin),
-            title: Text(conversation.isPinned ? '取消置顶' : '置顶'),
-            onTap: () async {
-              Navigator.pop(ctx);
-              await _chatService.togglePin(conversation.id);
-              await _loadConversations();
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.edit),
-            title: const Text('重命名'),
-            onTap: () {
-              Navigator.pop(ctx);
-              _renameConversation(conversation);
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.delete, color: Colors.red),
-            title: const Text('删除', style: TextStyle(color: Colors.red)),
-            onTap: () {
-              Navigator.pop(ctx);
-              _deleteConversation(conversation);
-            },
-          ),
-        ]),
       ),
     );
   }
