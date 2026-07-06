@@ -1,8 +1,20 @@
 # 小P 进度
 
-## 当前版本: v1.0.2
+## 当前版本: v1.1.0
 
 ## 版本历史
+
+### v1.1.0 (2026-07-06)
+- 内置 SenseNova 开箱即用（预置 API Key，deepseek-v4-flash）
+- 默认提供商改为 SenseNova，无需配置即可对话
+- 代码清理：删除死代码（voice_chat_screen 454行 + memory_extractor 245行）
+- 修复变量遮蔽 Bug（chat_screen 流式回调中 text 变量名冲突）
+- 去重：合并 clearMessages/deleteConversationMessages
+- 去重：删除对话列表重复排序
+- 去重：删除人格编辑重复 setCurrentCompanion 调用
+- 渐变色提取为 AppTheme.accentGradient 常量，替换 6 处硬编码
+- 移除未使用的 cupertino_icons 依赖
+- 版本号更新至 1.1.0+1
 
 ### v1.0.2 (2026-07-06)
 - thinking 模式开关：关闭时发送 `/no_think` 提示词
@@ -35,4 +47,5 @@
 
 ## 已知问题
 
-- 无
+- Gemma 4 的 thinking/reasoning 模式无法通过 API 关闭（模型内置）
+- 退出对话偶尔仍有卡顿（需进一步排查）
