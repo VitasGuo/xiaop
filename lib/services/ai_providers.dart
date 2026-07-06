@@ -1,4 +1,5 @@
 enum AiProviderType {
+  sensenova,
   lmstudio,
   deepseek,
   qwen,
@@ -42,6 +43,7 @@ class AiProviderConfig {
 
 class AiProviders {
   static const List<AiProviderConfig> all = [
+    sensenova,
     lmstudio,
     deepseek,
     qwen,
@@ -53,6 +55,20 @@ class AiProviders {
     doubao,
     custom,
   ];
+
+  static const sensenova = AiProviderConfig(
+    type: AiProviderType.sensenova,
+    displayName: 'SenseNova (开箱即用)',
+    defaultBaseUrl: 'https://token.sensenova.cn/v1',
+    defaultModel: 'deepseek-v4-flash',
+    availableModels: [
+      'deepseek-v4-flash',
+      'deepseek-v4-pro',
+      'sensenova-6.7-flash-lite',
+      'sensenova-u1-fast',
+    ],
+    presetApiKey: 'sk-py9Ad7LfOESDUSLPrALxOEDErGhDVVv6',
+  );
 
   static const lmstudio = AiProviderConfig(
     type: AiProviderType.lmstudio,

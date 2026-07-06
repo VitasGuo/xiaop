@@ -128,11 +128,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
       final buffer = StringBuffer();
       DateTime _lastUpdate = DateTime.now();
+      final convId = widget.conversationId; // 提前捕获，防止 dispose 后 widget 无效
 
       _cancelToken = CancelToken();
 
       await _chatService.streamAiResponse(
-        conversationId: widget.conversationId,
+        conversationId: convId,
         userMessage: text,
         providerName: aiConfig.provider,
         modelName: aiConfig.model,
@@ -188,8 +189,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             content: finalContent,
             timestamp: DateTime.now(),
           );
-          await _chatService.addMessage(widget.conversationId, finalMsg);
-          await _chatService.touchConversation(widget.conversationId);
+          await _chatService.addMessage(convId, finalMsg);
+          await _chatService.touchConversation(convId);
 
           // 提取记忆
           _extractMemory(text, finalContent, aiConfig);
