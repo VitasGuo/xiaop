@@ -203,8 +203,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           ),
           style: TextStyle(color: AppTheme.textPrimary),
-          onSubmitted: (_) {
-            ref.read(aiConfigProvider.notifier).update(customUrl: _urlController.text);
+          onChanged: (value) {
+            ref.read(aiConfigProvider.notifier).update(customUrl: value);
           },
         ),
         if (defaultUrl.isNotEmpty && _urlController.text != defaultUrl)
@@ -256,8 +256,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           ),
           style: TextStyle(color: AppTheme.textPrimary),
-          onSubmitted: (_) {
-            ref.read(aiConfigProvider.notifier).update(model: _modelController.text);
+          onChanged: (value) {
+            ref.read(aiConfigProvider.notifier).update(model: value);
           },
         ),
         if (defaultModel.isNotEmpty && _modelController.text != defaultModel)

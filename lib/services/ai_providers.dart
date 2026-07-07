@@ -58,7 +58,7 @@ class AiProviders {
 
   static const sensenova = AiProviderConfig(
     type: AiProviderType.sensenova,
-    displayName: 'SenseNova (开箱即用)',
+    displayName: 'SenseNova',
     defaultBaseUrl: 'https://token.sensenova.cn/v1',
     defaultModel: 'deepseek-v4-flash',
     availableModels: [
@@ -67,7 +67,6 @@ class AiProviders {
       'sensenova-6.7-flash-lite',
       'sensenova-u1-fast',
     ],
-    presetApiKey: 'sk-py9Ad7LfOESDUSLPrALxOEDErGhDVVv6',
   );
 
   static const lmstudio = AiProviderConfig(
