@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dio/dio.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:xiao_p/core/theme.dart';
 import 'package:xiao_p/main.dart';
 import 'package:xiao_p/providers/ai_config_provider.dart';
@@ -20,6 +21,7 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _ttsEnabled = true;
   bool _webSearchEnabled = true;
+  String _version = '';
   final TextEditingController _apiKeyController = TextEditingController();
   final TextEditingController _modelController = TextEditingController();
   final TextEditingController _urlController = TextEditingController();
@@ -29,6 +31,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   void initState() {
     super.initState();
     _loadSettings();
+    _loadVersion();
+  }
+
+  Future<void> _loadVersion() async {
+    final info = await PackageInfo.fromPlatform();
+    if (mounted) {
+      setState(() => _version = info.version);
+    }
   }
 
   @override
@@ -398,7 +408,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             Expanded(
               child: Text('关于小P', style: TextStyle(fontSize: 14, color: AppTheme.textPrimary)),
             ),
-            Text('v1.2.6', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+            Text('v$_version', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
             const SizedBox(width: 4),
             Icon(Icons.chevron_right, color: AppTheme.textSecondary, size: 18),
           ],

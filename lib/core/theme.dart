@@ -204,7 +204,7 @@ class ThemeService {
   static Future<void> setAccentColor(Color color) async {
     AppTheme.setAccentColor(color);
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_keyAccentColor, color.value);
+    await prefs.setInt(_keyAccentColor, color.toARGB32());
   }
 
   static ThemeData getTheme(AppThemeMode mode) {

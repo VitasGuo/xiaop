@@ -1,8 +1,24 @@
 # 小P 进度
 
-## 当前版本: v1.2.6
+## 当前版本: v1.2.7
 
 ## 版本历史
+
+### v1.2.7 (2026-07-08)
+- 发布前代码审查全量修复：
+  - 修复重新生成/重试导致用户消息重复保存的 bug（新增 isNewMessage 参数）
+  - 修复 typing indicator 与空 streaming bubble 同时显示
+  - 修复 flutter analyze 4 项问题（deprecated color.value / 下划线本地变量 / 死代码 / BuildContext 跨 async gap）
+  - 接入 MemoryService.incrementRecall 到 buildMemoryContext（原为死代码，记忆提升规则 recall_count 现可生效）
+  - 删除 WebSearchService.fetchPage 死代码
+  - 修复 _parseAndSaveExtractedMemories 的 void async 反模式
+  - settings_screen 版本号改用 package_info_plus 动态读取
+  - 修复 conversation_list_screen 的 _searchController 未释放
+  - system 主题模式监听 platformBrightness 变化（XiaoPApp 改为 StatefulWidget + WidgetsBindingObserver）
+  - 清除 about_screen 中 Stock-King + The-hacker-world 引用，修正 SenseNova "开箱即用" 描述
+  - 新增 MIT LICENSE
+  - README 补全安装/构建说明、核心数据流、修复 thinking 标签名
+  - .gitignore 补充敏感文件规则（.env / *.key / keystore / google-services.json 等）
 
 ### v1.2.6 (2026-07-06)
 - 主题色实时切换：重构 Theme 类，accentColor 改为可变，支持 5 种主题色

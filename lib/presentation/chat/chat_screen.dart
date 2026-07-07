@@ -88,26 +88,29 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     _chatController.clear();
     _lastUserMessage = text;
 
-    await _sendMessageInternal(text);
+    await _sendMessageInternal(text, isNewMessage: true);
   }
 
-  Future<void> _sendMessageInternal(String text) async {
-    final userMsg = ChatMessage(
-      id: '${DateTime.now().millisecondsSinceEpoch}_u',
-      role: 'user',
-      content: text,
-      timestamp: DateTime.now(),
-    );
-
-    // 保存用户消息到数据库
-    await _chatService.saveUserMessage(widget.conversationId, text);
+  /// [isNewMessage] 为 false 时表示重试/重新生成，用户消息已存在，不再重复保存和添加到 UI
+  Future<void> _sendMessageInternal(String text, {bool isNewMessage = true}) async {
+    if (isNewMessage) {
+      final userMsg = ChatMessage(
+        id: '${DateTime.now().millisecondsSinceEpoch}_u',
+        role: 'user',
+        content: text,
+        timestamp: DateTime.now(),
+      );
+      await _chatService.saveUserMessage(widget.conversationId, text);
+      setState(() {
+        _messages.add(userMsg);
+      });
+      _scrollToBottom();
+    }
 
     setState(() {
-      _messages.add(userMsg);
       _loading = true;
       _error = null;
     });
-    _scrollToBottom();
 
     try {
       final companion = ref.read(companionProvider);
@@ -132,7 +135,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       }
 
       final buffer = StringBuffer();
-      DateTime _lastUpdate = DateTime.now();
+      DateTime lastUpdate = DateTime.now();
       final convId = widget.conversationId; // 提前捕获，防止 dispose 后 widget 无效
 
       _cancelToken = CancelToken();
@@ -151,8 +154,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           buffer.write(token);
           // 节流：最多每50ms更新一次UI
           final now = DateTime.now();
-          if (mounted && now.difference(_lastUpdate).inMilliseconds > 50) {
-            _lastUpdate = now;
+          if (mounted && now.difference(lastUpdate).inMilliseconds > 50) {
+            lastUpdate = now;
             final text = buffer.toString();
             setState(() {
               final idx = _messages.indexWhere((m) => m.id == aiMsgId);
@@ -238,7 +241,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   Future<void> _retryMessage() async {
     if (_lastUserMessage == null || _loading) return;
-    await _sendMessageInternal(_lastUserMessage!);
+    await _sendMessageInternal(_lastUserMessage!, isNewMessage: false);
   }
 
   Future<void> _regenerateLastMessage() async {
@@ -251,7 +254,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     setState(() {
       _messages.removeRange(lastUserIdx + 1, _messages.length);
     });
-    await _sendMessageInternal(lastUserMsg);
+    await _sendMessageInternal(lastUserMsg, isNewMessage: false);
   }
 
   void _deleteMessage(int index) {
@@ -473,14 +476,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.all(16),
-      itemCount: _messages.length + (_loading ? 1 : 0),
+      itemCount: _messages.length,
       itemBuilder: (context, index) {
-        if (index == _messages.length && _loading) {
+        final msg = _messages[index];
+        // 流式开始时最后的空 assistant bubble 用 typing indicator 替代显示
+        if (index == _messages.length - 1 &&
+            _loading &&
+            msg.role == 'assistant' &&
+            msg.content.isEmpty) {
           return _buildTypingIndicator();
         }
         return ChatBubble(
-          message: _messages[index],
-          onRegenerate: _messages[index].role == 'assistant' &&
+          message: msg,
+          onRegenerate: msg.role == 'assistant' &&
               index == _messages.length - 1 &&
               !_loading
               ? () => _regenerateLastMessage()

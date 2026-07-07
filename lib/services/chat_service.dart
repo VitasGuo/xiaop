@@ -420,7 +420,7 @@ importance: 1-5（1=琐碎，5=核心信息）
     }
   }
 
-  void _parseAndSaveExtractedMemories(String content) async {
+  Future<void> _parseAndSaveExtractedMemories(String content) async {
     try {
       String jsonStr = content.trim();
       if (jsonStr.startsWith('```json')) jsonStr = jsonStr.substring(7);

@@ -198,6 +198,7 @@ class MemoryService {
 
   static Future<String> buildMemoryContext(String recentConversation) async {
     final buffer = StringBuffer();
+    final recalledIds = <int>[];
 
     // L1: 长期记忆 - 最重要
     final longTerm = await getLongTermMemories();
@@ -205,6 +206,7 @@ class MemoryService {
       buffer.writeln('【长期记忆】');
       for (final m in longTerm.take(15)) {
         buffer.writeln('${m.key}: ${m.value}');
+        if (m.id != null) recalledIds.add(m.id!);
       }
     }
 
@@ -214,6 +216,7 @@ class MemoryService {
       buffer.writeln('【近期记忆】');
       for (final m in hot.take(10)) {
         buffer.writeln('${m.key}: ${m.value}');
+        if (m.id != null) recalledIds.add(m.id!);
       }
     }
 
@@ -223,6 +226,7 @@ class MemoryService {
       buffer.writeln('【用户偏好】');
       for (final m in userPrefs.take(8)) {
         buffer.writeln('${m.key}: ${m.value}');
+        if (m.id != null) recalledIds.add(m.id!);
       }
     }
 
@@ -231,6 +235,7 @@ class MemoryService {
       buffer.writeln('【情绪记录】');
       for (final m in emotions.take(5)) {
         buffer.writeln('${m.key}: ${m.value}');
+        if (m.id != null) recalledIds.add(m.id!);
       }
     }
 
@@ -239,7 +244,13 @@ class MemoryService {
       buffer.writeln('【已知事实】');
       for (final m in facts.take(10)) {
         buffer.writeln('${m.key}: ${m.value}');
+        if (m.id != null) recalledIds.add(m.id!);
       }
+    }
+
+    // 记录召回次数（用于记忆整合时提升重要性）
+    for (final id in recalledIds) {
+      await incrementRecall(id);
     }
 
     return buffer.toString();

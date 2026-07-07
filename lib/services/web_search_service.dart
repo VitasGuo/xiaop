@@ -78,30 +78,4 @@ class WebSearchService {
     }
     return html;
   }
-
-  /// 获取网页内容摘要
-  Future<String> fetchPage(String url, {int maxChars = 3000}) async {
-    try {
-      final response = await http.get(
-        Uri.parse(url),
-        headers: {'User-Agent': 'Mozilla/5.0'},
-      ).timeout(const Duration(seconds: 15));
-
-      if (response.statusCode != 200) return '';
-
-      String html = response.body;
-      // 移除脚本和样式
-      html = html.replaceAll(RegExp(r'<script[^>]*>[\s\S]*?</script>', caseSensitive: false), '');
-      html = html.replaceAll(RegExp(r'<style[^>]*>[\s\S]*?</style>', caseSensitive: false), '');
-      html = html.replaceAll(RegExp(r'<[^>]+>'), ' ');
-      html = html.replaceAll(RegExp(r'\s+'), ' ').trim();
-
-      if (html.length > maxChars) {
-        html = '${html.substring(0, maxChars)}...';
-      }
-      return html;
-    } catch (_) {
-      return '';
-    }
-  }
 }

@@ -363,13 +363,13 @@ class _MemoryScreenState extends State<MemoryScreen> {
                 child: ElevatedButton(
                   onPressed: () async {
                     if (keyController.text.isNotEmpty && valueController.text.isNotEmpty) {
+                      Navigator.pop(ctx);
                       await MemoryService.upsertMemory(
                         categoryController.text,
                         keyController.text.trim(),
                         valueController.text.trim(),
                         importance: importance,
                       );
-                      Navigator.pop(ctx);
                       await _loadMemories();
                     }
                   },

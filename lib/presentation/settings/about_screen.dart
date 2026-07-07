@@ -102,7 +102,7 @@ class _AboutScreenState extends State<AboutScreen> {
 
           // 功能特性
           _buildSection('功能特性', [
-            _buildFeatureItem('多AI提供商', 'SenseNova(开箱即用) + LM Studio + DeepSeek + Qwen + Kimi + GLM + MiMo + 文心 + 混元 + 豆包 + 自定义'),
+            _buildFeatureItem('多AI提供商', 'SenseNova + LM Studio + DeepSeek + Qwen + Kimi + GLM + MiMo + 文心 + 混元 + 豆包 + 自定义'),
             _buildFeatureItem('流式对话', 'SSE 流式输出，AI回复逐字显示'),
             _buildFeatureItem('思考模式', '支持 reasoning/thinking，聊天气泡内折叠展示'),
             _buildFeatureItem('分层记忆', 'L0-L4 五层记忆系统，SQLite 存储'),
@@ -118,12 +118,12 @@ class _AboutScreenState extends State<AboutScreen> {
 
           const SizedBox(height: 24),
 
-          // 开源信息
-          _buildSection('开源', [
-            _buildInfoRow('基于', 'Stock-King + The-hacker-world'),
+          // 技术信息
+          _buildSection('技术栈', [
             _buildInfoRow('状态管理', 'Riverpod'),
             _buildInfoRow('路由', 'GoRouter'),
             _buildInfoRow('网络', 'Dio'),
+            _buildInfoRow('开源协议', 'MIT'),
           ]),
 
           const SizedBox(height: 32),

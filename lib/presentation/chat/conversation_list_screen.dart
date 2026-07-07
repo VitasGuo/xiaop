@@ -27,6 +27,12 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
   }
 
   @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     _loadConversations();
@@ -154,9 +160,12 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
             .toList();
 
     if (filtered.isEmpty) {
+      if (_searchQuery.isEmpty) {
+        return _buildEmptyState();
+      }
       return Center(
         child: Text(
-          _searchQuery.isEmpty ? '还没有对话' : '没有匹配的对话',
+          '没有匹配的对话',
           style: TextStyle(fontSize: 16, color: AppTheme.textSecondary),
         ),
       );

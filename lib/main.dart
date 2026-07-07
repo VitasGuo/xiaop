@@ -29,12 +29,35 @@ void main() async {
   ));
 }
 
-class XiaoPApp extends ConsumerWidget {
+class XiaoPApp extends ConsumerStatefulWidget {
   final bool startOnHome;
   const XiaoPApp({super.key, required this.startOnHome});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<XiaoPApp> createState() => _XiaoPAppState();
+}
+
+class _XiaoPAppState extends ConsumerState<XiaoPApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangePlatformBrightness() {
+    // 系统深浅色变化时，跟随系统模式需触发重建以应用新亮度
+    setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final themeMode = ref.watch(themeModeProvider);
 
     return MaterialApp.router(

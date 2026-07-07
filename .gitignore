@@ -47,3 +47,16 @@ Thumbs.db
 *.aab
 *.ipa
 *.app
+
+# Secrets / credentials
+.env
+.env.*
+*.key
+*.pem
+*.keystore
+*.jks
+google-services.json
+GoogleService-Info.plist
+credentials.json
+*secrets*.json
+*api_key*.json
