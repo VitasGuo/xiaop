@@ -158,18 +158,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               child: Text(p.displayName),
             );
           }).toList(),
-          onChanged: (value) {
+          onChanged: (value) async {
             if (value != null) {
-              final provider = AiProviders.getByName(value);
-              ref.read(aiConfigProvider.notifier).update(
-                    provider: value,
-                    model: provider?.defaultModel ?? '',
-                    customUrl: provider?.defaultBaseUrl ?? '',
-                  );
+              final notifier = ref.read(aiConfigProvider.notifier);
+              await notifier.switchProvider(value);
+              final newConfig = ref.read(aiConfigProvider);
               _reloadApiKey(value);
               setState(() {
-                _modelController.text = provider?.defaultModel ?? '';
-                _urlController.text = provider?.defaultBaseUrl ?? '';
+                _modelController.text = newConfig.effectiveModel;
+                _urlController.text = newConfig.effectiveUrl;
               });
             }
           },
