@@ -241,7 +241,12 @@ class ChatService {
     // 引导 AI 使用工具
     if (provider.supportsToolUse && webSearchEnabled) {
       systemPrompt.writeln('');
-      systemPrompt.writeln('你可以使用工具来获取实时信息。当需要最新资讯、天气、价格等时效性信息时，请调用 web_search 工具。当需要当前日期时间时，请调用 get_current_time 工具。不需要时直接回答即可。');
+      systemPrompt.writeln('你可以使用工具来获取实时信息。');
+      systemPrompt.writeln('当需要最新资讯、新闻、天气、价格、体育赛果等时效性信息，或你不确定的事实时，请调用 web_search 工具。');
+      systemPrompt.writeln('当需要当前日期时间时，请调用 get_current_time 工具。');
+      systemPrompt.writeln('如果第一次搜索结果信息不足，请换关键词再次搜索（最多5轮）。');
+      systemPrompt.writeln('搜索结果会包含网页摘要和正文内容，请基于这些信息给出准确、详细的回答。');
+      systemPrompt.writeln('不需要工具时直接回答即可。');
     }
 
     final messages = await getMessages(conversationId);
@@ -537,8 +542,8 @@ class ChatService {
           if (query.isEmpty) return '搜索关键词为空';
           Log.d('工具调用 web_search: "$query"');
           final result = await WebSearchService().search(query).timeout(
-            const Duration(seconds: 10),
-            onTimeout: () => '搜索超时',
+            const Duration(seconds: 20),
+            onTimeout: () => '搜索超时，请基于已有信息回答',
           );
           return result.isEmpty ? '未找到相关结果' : result;
 
