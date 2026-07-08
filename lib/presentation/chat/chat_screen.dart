@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,9 +11,11 @@ import 'package:xiao_p/models/chat_message.dart';
 import 'package:xiao_p/providers/ai_config_provider.dart';
 import 'package:xiao_p/providers/companion_providers.dart';
 import 'package:xiao_p/services/chat_service.dart';
+import 'package:xiao_p/services/memory_extractor.dart';
 import 'package:xiao_p/services/memory_service.dart';
 import 'package:xiao_p/services/stt_service.dart';
 import 'package:xiao_p/services/tts_service.dart';
+import 'package:xiao_p/services/tools/tool_registry.dart';
 import 'package:xiao_p/presentation/widgets/chat_bubble.dart';
 import 'package:xiao_p/presentation/widgets/voice_button.dart';
 import 'package:xiao_p/presentation/widgets/companion_avatar.dart';
@@ -174,19 +175,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         },
         onToolCall: (toolName, args) {
           // 工具调用反馈：在流式输出中插入提示
-          String hint;
-          if (toolName == 'web_search') {
-            try {
-              final parsed = jsonDecode(args);
-              hint = '\n\n> 🔍 正在搜索: ${parsed['query'] ?? args}\n\n';
-            } catch (_) {
-              hint = '\n\n> 🔍 正在搜索: $args\n\n';
-            }
-          } else if (toolName == 'get_current_time') {
-            hint = '\n\n> 🕐 获取当前时间...\n\n';
-          } else {
-            hint = '\n\n> 🔧 调用工具: $toolName\n\n';
-          }
+          final hint = ToolRegistry().getUiHint(toolName, args)
+              ?? '\n\n> 🔧 调用工具: $toolName\n\n';
           buffer.write(hint);
           if (mounted) {
             setState(() {
@@ -305,7 +295,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   void _extractMemory(String userMessage, String aiResponse, AiConfig aiConfig) {
     // AI 记忆提取（异步，不阻塞 UI）
-    _chatService.extractMemoryWithAI(
+    MemoryExtractor().extractFromConversation(
       userMessage: userMessage,
       aiResponse: aiResponse,
       providerName: aiConfig.provider,

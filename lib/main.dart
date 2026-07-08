@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xiao_p/core/theme.dart';
 import 'package:xiao_p/routes/app_router.dart';
+import 'package:xiao_p/services/tools/tool_registry.dart';
 
 final themeModeProvider = StateProvider<AppThemeMode>((ref) => AppThemeMode.dark);
 
@@ -18,6 +19,9 @@ void main() async {
   await ThemeService.loadAccentColor();
   final prefs = await SharedPreferences.getInstance();
   final hasOnboarded = prefs.getBool('onboarded') ?? false;
+
+  // 注册内置工具插件
+  ToolRegistry().registerBuiltin();
 
   if (!hasOnboarded) {
     await prefs.setBool('onboarded', true);

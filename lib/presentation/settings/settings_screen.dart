@@ -9,6 +9,8 @@ import 'package:xiao_p/main.dart';
 import 'package:xiao_p/providers/ai_config_provider.dart';
 import 'package:xiao_p/services/ai_providers.dart';
 import 'package:xiao_p/services/api_key_service.dart';
+import 'package:xiao_p/services/tools/tool_registry.dart';
+import 'package:xiao_p/services/tools/tool_plugin.dart';
 import 'package:xiao_p/services/tts_service.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -102,6 +104,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           _buildContextLengthSlider(aiConfig),
           const SizedBox(height: 8),
           _buildWebSearchToggle(),
+          const SizedBox(height: 8),
+          _buildToolManagementEntry(),
           const SizedBox(height: 24),
           _buildSectionTitle('语音设置'),
           _buildTtsToggle(),
@@ -611,6 +615,128 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       }),
       contentPadding: EdgeInsets.zero,
     );
+  }
+
+  Widget _buildToolManagementEntry() {
+    final tools = ToolRegistry().allTools;
+    return ListTile(
+      leading: Icon(Icons.build_circle_outlined, color: AppTheme.accentColor, size: 22),
+      title: Text('工具管理', style: TextStyle(color: AppTheme.textPrimary)),
+      subtitle: Text(
+        '${tools.length} 个工具可用',
+        style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+      ),
+      trailing: Icon(Icons.chevron_right, color: AppTheme.textSecondary, size: 20),
+      contentPadding: EdgeInsets.zero,
+      onTap: () => _showToolManagementSheet(),
+    );
+  }
+
+  void _showToolManagementSheet() {
+    final tools = ToolRegistry().allTools;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppTheme.cardColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            return SafeArea(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        Text(
+                          '工具管理',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.textPrimary,
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          '关闭后 AI 不会调用该工具',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  ...tools.map((tool) {
+                    return FutureBuilder<bool>(
+                      future: _getToolEnabled(tool.name),
+                      builder: (ctx, snapshot) {
+                        final enabled = snapshot.data ?? true;
+                        return SwitchListTile(
+                          secondary: Icon(
+                            _categoryIcon(tool.category),
+                            color: AppTheme.accentColor,
+                            size: 22,
+                          ),
+                          title: Text(
+                            tool.displayName,
+                            style: TextStyle(color: AppTheme.textPrimary),
+                          ),
+                          subtitle: Text(
+                            tool.description,
+                            style: TextStyle(
+                              color: AppTheme.textSecondary,
+                              fontSize: 12,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          value: enabled,
+                          onChanged: (value) async {
+                            final prefs = await SharedPreferences.getInstance();
+                            await prefs.setBool('tool_enabled_${tool.name}', value);
+                            setSheetState(() {});
+                          },
+                          thumbColor: WidgetStateProperty.resolveWith((states) {
+                            if (states.contains(WidgetState.selected)) {
+                              return AppTheme.accentColor;
+                            }
+                            return null;
+                          }),
+                        );
+                      },
+                    );
+                  }),
+                  const SizedBox(height: 8),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<bool> _getToolEnabled(String name) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool('tool_enabled_$name') ?? true;
+  }
+
+  IconData _categoryIcon(ToolCategory category) {
+    switch (category) {
+      case ToolCategory.search:
+        return Icons.search;
+      case ToolCategory.utility:
+        return Icons.handyman_outlined;
+      case ToolCategory.productivity:
+        return Icons.calculate_outlined;
+      case ToolCategory.system:
+        return Icons.schedule;
+    }
   }
 
   Widget _buildTtsToggle() {

@@ -1,8 +1,37 @@
 # 小P 进度
 
-## 当前版本: v1.3.1
+## 当前版本: v1.4.1
 
 ## 版本历史
+
+### v1.4.1 (2026-07-08)
+- **新增位置获取工具**：
+  - GetLocationTool：GPS 定位 + Nominatim 反向地理编码获取城市名
+  - 用户问天气未指定城市时，AI 自动调用 get_location 获取位置再查天气
+  - AndroidManifest 添加 ACCESS_FINE_LOCATION / ACCESS_COARSE_LOCATION 权限
+  - 依赖 geolocator ^14.0.3
+- **Agent Loop 修复**：
+  - H1: onToolCall 移到 execute 之前（用户立即看到"正在搜索..."提示）
+  - H2: fullBuffer 累积工具提示，流式显示与最终保存一致
+  - H3: 请求取消后不再保存半截消息/不触发记忆提取（_StreamResult.cancelled）
+  - M2: Agent Loop 循环改为 <= maxIterations，第5轮工具结果不再被丢弃
+- **死代码清理**：
+  - 删除 getAllSchemas/isRegistered（从未调用）
+  - 删除 _StreamResult.finishReason 字段（从未读取）
+  - 修复 exchange_rate_tool 三元表达式两分支相同的死逻辑
+  - 移除误加的 ignore 注释，禁用 use_null_aware_elements lint（map entry 不适用）
+
+### v1.4.0 (2026-07-08)
+- **工具插件系统**：
+  - 插件注册制架构（ToolPlugin 接口 + ToolRegistry 单例）
+  - 6 个内置工具：联网搜索、当前时间、天气查询、汇率换算、计算器、翻译
+  - 设置页工具管理入口（底部弹窗展示所有工具 + 单独开关）
+  - ChatService 改用 ToolRegistry 动态获取 schemas（不再硬编码工具定义）
+  - 通用 system prompt（引导 AI 按 schema 自主选择工具）
+- **死代码清理**：删除 message_service.dart（sqflite 保留，MemoryService 仍需要）
+- **MemoryExtractor 接线**：修复 apiKey 三种情况处理（presetKey/needsApiKey/无key），接入 chat_screen
+- CalculatorTool 依赖 expressions ^0.2.5+3（纯 Dart 表达式解析，支持 ^→pow() 预处理）
+- 修复 4 个断裂点：registerBuiltin 空壳、main 未注册、chat_service 编译错误、expressions 版本号
 
 ### v1.3.1 (2026-07-08)
 - **搜索质量大幅提升**：

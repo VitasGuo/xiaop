@@ -8,6 +8,7 @@ import 'package:xiao_p/models/conversation.dart';
 import 'package:xiao_p/services/ai_providers.dart';
 import 'package:xiao_p/services/api_key_service.dart';
 import 'package:xiao_p/services/memory_service.dart';
+import 'package:xiao_p/services/tools/tool_registry.dart';
 import 'package:xiao_p/services/web_search_service.dart';
 import 'package:dio/dio.dart';
 
@@ -149,38 +150,6 @@ class ChatService {
 
   // ==================== AI 响应（流式 + Agent Loop） ====================
 
-  /// 工具定义 schema（OpenAI 兼容 function calling 格式）
-  static const _toolDefinitions = [
-    {
-      'type': 'function',
-      'function': {
-        'name': 'web_search',
-        'description': '搜索互联网获取最新信息、新闻、天气、价格等实时数据。当用户询问时效性信息或你不确定的事实时调用此工具。',
-        'parameters': {
-          'type': 'object',
-          'properties': {
-            'query': {
-              'type': 'string',
-              'description': '搜索关键词，用简洁的词语描述要查找的内容',
-            },
-          },
-          'required': ['query'],
-        },
-      },
-    },
-    {
-      'type': 'function',
-      'function': {
-        'name': 'get_current_time',
-        'description': '获取当前日期和时间。当用户询问今天日期、当前时间时调用。',
-        'parameters': {
-          'type': 'object',
-          'properties': {},
-        },
-      },
-    },
-  ];
-
   Future<void> streamAiResponse({
     required String conversationId,
     required String userMessage,
@@ -241,12 +210,8 @@ class ChatService {
     // 引导 AI 使用工具
     if (provider.supportsToolUse && webSearchEnabled) {
       systemPrompt.writeln('');
-      systemPrompt.writeln('你可以使用工具来获取实时信息。');
-      systemPrompt.writeln('当需要最新资讯、新闻、天气、价格、体育赛果等时效性信息，或你不确定的事实时，请调用 web_search 工具。');
-      systemPrompt.writeln('当需要当前日期时间时，请调用 get_current_time 工具。');
-      systemPrompt.writeln('如果第一次搜索结果信息不足，请换关键词再次搜索（最多5轮）。');
-      systemPrompt.writeln('搜索结果会包含网页摘要和正文内容，请基于这些信息给出准确、详细的回答。');
-      systemPrompt.writeln('不需要工具时直接回答即可。');
+      systemPrompt.writeln('你可以使用工具来获取实时信息和处理任务。根据用户需求选择合适的工具调用，不需要工具时直接回答即可。');
+      systemPrompt.writeln('当用户询问天气但未指定城市时，先调用 get_location 获取位置，再查天气。');
     }
 
     final messages = await getMessages(conversationId);
@@ -274,9 +239,10 @@ class ChatService {
     final fullBuffer = StringBuffer();
 
     // ===== 路径 A：支持 Function Calling → Agent Loop =====
-    if (provider.supportsToolUse && webSearchEnabled) {
+    final enabledSchemas = await ToolRegistry().getEnabledSchemas();
+    if (provider.supportsToolUse && webSearchEnabled && enabledSchemas.isNotEmpty) {
       const maxIterations = 5;
-      for (var iteration = 0; iteration < maxIterations; iteration++) {
+      for (var iteration = 0; iteration <= maxIterations; iteration++) {
         final result = await _streamRequest(
           dio: dio,
           url: '$baseUrl/chat/completions',
@@ -284,7 +250,7 @@ class ChatService {
           modelName: modelName,
           messages: apiMessages,
           enableThinking: enableThinking,
-          tools: _toolDefinitions,
+          tools: enabledSchemas,
           cancelToken: cancelToken,
           onToken: onToken,
         );
@@ -298,41 +264,47 @@ class ChatService {
           return;
         }
 
+        // 请求被取消 → 直接退出，不保存半截内容
+        if (result.cancelled) return;
+
         // 累积内容
         if (result.content.isNotEmpty) {
           fullBuffer.write(result.content);
         }
 
-        // 有工具调用 → 执行并循环
-        if (result.toolCalls.isNotEmpty) {
-          // 把 assistant 消息（含 tool_calls）加入上下文
-          final assistantMsg = <String, dynamic>{
-            'role': 'assistant',
-            if (result.content.isNotEmpty) 'content': result.content,
-            'tool_calls': result.toolCalls.map((tc) => tc.toApiJson()).toList(),
-          };
-          apiMessages.add(assistantMsg);
-
-          // 执行每个工具调用
-          for (final tc in result.toolCalls) {
-            final toolResult = await _executeTool(tc.name, tc.arguments);
-            apiMessages.add({
-              'role': 'tool',
-              'tool_call_id': tc.id,
-              'content': toolResult,
-            });
-            // UI 反馈
-            if (onToolCall != null) {
-              onToolCall(tc.name, tc.arguments);
-            }
-          }
-          // 继续循环，让 AI 看到工具结果后继续
-          continue;
+        // 无工具调用 → 完成
+        if (result.toolCalls.isEmpty) {
+          onComplete(fullBuffer.toString());
+          return;
         }
 
-        // 无工具调用 → 完成
-        onComplete(fullBuffer.toString());
-        return;
+        // 有工具调用 → 执行并循环
+        // 把 assistant 消息（含 tool_calls）加入上下文
+        final assistantMsg = <String, dynamic>{
+          'role': 'assistant',
+          if (result.content.isNotEmpty) 'content': result.content,
+          'tool_calls': result.toolCalls.map((tc) => tc.toApiJson()).toList(),
+        };
+        apiMessages.add(assistantMsg);
+
+        // 执行每个工具调用（先反馈 UI，再执行）
+        for (final tc in result.toolCalls) {
+          // 先反馈 UI（用户立刻看到"正在搜索..."）
+          final hint = ToolRegistry().getUiHint(tc.name, tc.arguments)
+              ?? '\n\n> 🔧 调用工具: ${tc.name}\n\n';
+          fullBuffer.write(hint);
+          if (onToolCall != null) {
+            onToolCall(tc.name, tc.arguments);
+          }
+          // 再执行工具
+          final toolResult = await ToolRegistry().execute(tc.name, tc.arguments);
+          apiMessages.add({
+            'role': 'tool',
+            'tool_call_id': tc.id,
+            'content': toolResult,
+          });
+        }
+        // 继续循环，让 AI 看到工具结果后继续
       }
       // 超过最大轮数
       if (fullBuffer.isNotEmpty) {
@@ -378,6 +350,9 @@ class ChatService {
       onToken: onToken,
     );
 
+    // 请求被取消 → 直接退出
+    if (result.cancelled) return;
+
     if (result.error != null) {
       if (result.content.isNotEmpty) {
         onComplete(result.content);
@@ -403,7 +378,6 @@ class ChatService {
   }) async {
     final contentBuffer = StringBuffer();
     final toolCallAccumulator = <int, _ToolCallBuilder>{};
-    String? finishReason;
 
     try {
       final response = await dio.post(
@@ -419,7 +393,6 @@ class ChatService {
           'temperature': 0.7,
           'max_tokens': 4096,
           'stream': true,
-          // ignore: use_null_aware_elements
           if (tools != null) 'tools': tools,
           if (enableThinking) 'reasoning': {'effort': 'high'},
         },
@@ -445,8 +418,6 @@ class ChatService {
             if (choices == null || choices.isEmpty) continue;
             final choice = choices[0] as Map<String, dynamic>;
             final delta = choice['delta'] as Map<String, dynamic>?;
-            final reason = choice['finish_reason'] as String?;
-            if (reason != null) finishReason = reason;
 
             if (delta == null) continue;
 
@@ -508,11 +479,10 @@ class ChatService {
       return _StreamResult(
         content: contentBuffer.toString(),
         toolCalls: parsedToolCalls,
-        finishReason: finishReason,
       );
     } on DioException catch (e) {
       if (e.type == DioExceptionType.cancel) {
-        return _StreamResult(content: contentBuffer.toString());
+        return _StreamResult(content: contentBuffer.toString(), cancelled: true);
       }
       String msg = '连接失败';
       if (e.type == DioExceptionType.connectionTimeout ||
@@ -526,156 +496,6 @@ class ChatService {
       return _StreamResult(content: contentBuffer.toString(), error: msg);
     } catch (e) {
       return _StreamResult(content: contentBuffer.toString(), error: '连接失败: $e');
-    }
-  }
-
-  /// 执行工具调用，返回结果文本
-  Future<String> _executeTool(String name, String arguments) async {
-    try {
-      final args = arguments.isNotEmpty
-          ? jsonDecode(arguments) as Map<String, dynamic>
-          : <String, dynamic>{};
-
-      switch (name) {
-        case 'web_search':
-          final query = args['query'] as String? ?? '';
-          if (query.isEmpty) return '搜索关键词为空';
-          Log.d('工具调用 web_search: "$query"');
-          final result = await WebSearchService().search(query).timeout(
-            const Duration(seconds: 20),
-            onTimeout: () => '搜索超时，请基于已有信息回答',
-          );
-          return result.isEmpty ? '未找到相关结果' : result;
-
-        case 'get_current_time':
-          final now = DateTime.now();
-          return '当前时间: ${now.year}年${now.month}月${now.day}日 ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}（星期${_weekday(now.weekday)}）';
-
-        default:
-          return '未知工具: $name';
-      }
-    } catch (e) {
-      Log.w('工具执行失败: $e');
-      return '工具执行失败: $e';
-    }
-  }
-
-  String _weekday(int n) {
-    const map = ['', '一', '二', '三', '四', '五', '六', '日'];
-    return map[n];
-  }
-
-  // ==================== AI 记忆提取 ====================
-
-  Future<void> extractMemoryWithAI({
-    required String userMessage,
-    required String aiResponse,
-    required String providerName,
-    required String modelName,
-    String? customUrl,
-  }) async {
-    try {
-      final provider = AiProviders.getByName(providerName);
-      if (provider == null) return;
-
-      final baseUrl = customUrl?.isNotEmpty == true
-          ? customUrl!
-          : provider.defaultBaseUrl;
-      if (baseUrl.isEmpty) return;
-
-      String? apiKey;
-      if (provider.hasPresetKey) {
-        apiKey = provider.presetApiKey;
-      } else if (provider.needsApiKey) {
-        apiKey = await ApiKeyService.getEffectiveApiKey(provider);
-      }
-
-      final existingMemories = await MemoryService.buildMemoryContext('');
-
-      final prompt = '''你是一个记忆提取助手。分析以下对话，提取值得长期记住的信息。
-
-用户说：$userMessage
-AI回复：$aiResponse
-
-已有记忆：
-$existingMemories
-
-请提取以下类型的信息（JSON数组格式，每条包含 category、key、value、importance）：
-- category: "fact" - 用户的基本事实（名字、职业、年龄、家庭、住址等）
-- category: "user_preference" - 用户的喜好（喜欢/讨厌什么、偏好）
-- category: "emotion" - 用户的情绪状态
-- category: "important_event" - 重要事件
-- category: "habit" - 用户的日常习惯
-- category: "relationship" - 用户提到的人际关系
-
-importance: 1-5（1=琐碎，5=核心信息）
-
-规则：
-1. 只提取明确提到的信息，不要猜测
-2. 如果已有相同信息，不要重复
-3. 如果信息有更新，覆盖旧信息
-4. 每次最多提取3条最重要的信息
-5. 无信息可提取时输出空数组 []
-6. 必须输出合法的JSON数组
-
-输出格式：
-[{"category":"fact","key":"用户名字","value":"小明","importance":3}]''';
-
-      final dio = createDio(
-        connectTimeout: const Duration(seconds: 15),
-        receiveTimeout: const Duration(seconds: 30),
-      );
-
-      final headers = <String, String>{
-        'Content-Type': 'application/json',
-      };
-      if (apiKey != null && apiKey.isNotEmpty) {
-        headers['Authorization'] = 'Bearer $apiKey';
-      }
-
-      final response = await dio.post(
-        '$baseUrl/chat/completions',
-        options: Options(headers: headers),
-        data: {
-          if (modelName.isNotEmpty) 'model': modelName,
-          'messages': [
-            {'role': 'system', 'content': '你是一个记忆提取助手，只输出JSON数组。'},
-            {'role': 'user', 'content': prompt},
-          ],
-          'temperature': 0.1,
-          'max_tokens': 512,
-        },
-      );
-
-      if (response.statusCode == 200) {
-        final content = response.data['choices'][0]['message']['content'] as String;
-        _parseAndSaveExtractedMemories(content);
-      }
-    } catch (e) {
-      Log.w('AI记忆提取失败: $e');
-    }
-  }
-
-  Future<void> _parseAndSaveExtractedMemories(String content) async {
-    try {
-      String jsonStr = content.trim();
-      if (jsonStr.startsWith('```json')) jsonStr = jsonStr.substring(7);
-      if (jsonStr.startsWith('```')) jsonStr = jsonStr.substring(3);
-      if (jsonStr.endsWith('```')) jsonStr = jsonStr.substring(0, jsonStr.length - 3);
-      jsonStr = jsonStr.trim();
-
-      final List<dynamic> memories = jsonDecode(jsonStr);
-      for (final item in memories) {
-        final map = item as Map<String, dynamic>;
-        final category = map['category'] as String;
-        final key = map['key'] as String;
-        final value = map['value'] as String;
-        final importance = (map['importance'] as num?)?.toInt() ?? 2;
-
-        await MemoryService.upsertMemory(category, key, value, importance: importance);
-      }
-    } catch (e) {
-      Log.w('解析AI记忆失败: $e');
     }
   }
 
@@ -742,14 +562,14 @@ importance: 1-5（1=琐碎，5=核心信息）
 class _StreamResult {
   final String content;
   final List<_ToolCall> toolCalls;
-  final String? finishReason;
   final String? error;
+  final bool cancelled;
 
   _StreamResult({
     this.content = '',
     this.toolCalls = const [],
-    this.finishReason,
     this.error,
+    this.cancelled = false,
   });
 }
 

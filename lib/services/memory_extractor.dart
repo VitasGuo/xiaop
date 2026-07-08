@@ -26,13 +26,18 @@ class MemoryExtractor {
       final provider = AiProviders.getByName(providerName);
       if (provider == null) return;
 
-      final baseUrl = provider.isCustom
-          ? (customUrl?.isNotEmpty == true ? customUrl! : provider.defaultBaseUrl)
+      final baseUrl = customUrl?.isNotEmpty == true
+          ? customUrl!
           : provider.defaultBaseUrl;
       if (baseUrl.isEmpty) return;
 
-      final apiKey = await ApiKeyService.getEffectiveApiKey(provider);
-      if (apiKey.isEmpty) return;
+      String? apiKey;
+      if (provider.hasPresetKey) {
+        apiKey = provider.presetApiKey;
+      } else if (provider.needsApiKey) {
+        apiKey = await ApiKeyService.getEffectiveApiKey(provider);
+        if (apiKey.isEmpty) return;
+      }
 
       final existingMemories = await MemoryService.buildMemoryContext('');
 

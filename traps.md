@@ -39,3 +39,13 @@
 - **现象**: 用 PowerShell `-replace` 替换中文字符串后文件乱码，Flutter 编译报错
 - **根因**: PowerShell 的 `-replace` 运算符对 Unicode 处理有问题，会截断多字节字符
 - **解决**: 用 Dart/Flutter 的 edit 工具逐文件替换，不要用 PowerShell 批量替换含中文的代码文件
+
+## #9 expressions 包版本号错误导致 pub get 失败
+- **现象**: `Because xiao_p depends on expressions ^5.0.0 which doesn't match any versions, version solving failed.`
+- **根因**: pubspec.yaml 写了 `expressions: ^5.0.0`，但 pub.dev 上 expressions 包最新版本是 0.2.5+3（版本号体系不同，不是 5.x 大版本）
+- **解决**: 改为 `expressions: ^0.2.5+3`，API（`Expression.parse()` + `ExpressionEvaluator().eval()`）完全兼容
+
+## #10 工具系统接线断裂导致 agent 无法调用工具
+- **现象**: 工具插件文件全部创建完成，但 AI 始终不调用工具，表现为"只能 chat 不能 work"
+- **根因**: 4 个接线点断裂：① `tool_registry.dart` 的 `registerBuiltin()` 方法体为空（只有注释）；② `main.dart` 未调用 `registerBuiltin()`；③ `chat_service.dart` 引用已删除的 `_toolDefinitions` 且未 import `tool_registry.dart`（编译错误）；④ `expressions` 版本号错误导致 pub get 失败
+- **解决**: 逐一修复 4 个断裂点：填充 registerBuiltin、main 中注册、chat_service 改用 `ToolRegistry().getEnabledSchemas()`、expressions 版本改为 ^0.2.5+3
