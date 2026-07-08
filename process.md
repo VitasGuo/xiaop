@@ -4,6 +4,15 @@
 
 ## 版本历史
 
+### v1.4.1-patch (2026-07-08)
+- **修复工具系统不工作**：
+  - 根因：Agent Loop 条件依赖 `webSearchEnabled`，用户关闭联网搜索后整个工具系统被禁用
+  - 修复：Agent Loop 条件改为只检查 `enabledSchemas.isNotEmpty`，不再依赖 `webSearchEnabled`
+  - 路径 B（规则搜索）仍由 `webSearchEnabled` 控制
+- **修复日志不可见**：`Log.d` 从 `dart:developer` 改为 `debugPrint`，确保 flutter run 控制台可见
+- **修复 Gradle 编译超时**：`dl.google.com` 被墙，切换阿里云镜像仓库
+- **测试验证**：get_location → weather 多轮工具调用成功（深圳天气）
+
 ### v1.4.1 (2026-07-08)
 - **新增位置获取工具**：
   - GetLocationTool：GPS 定位 + Nominatim 反向地理编码获取城市名

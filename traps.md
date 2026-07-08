@@ -49,3 +49,18 @@
 - **现象**: 工具插件文件全部创建完成，但 AI 始终不调用工具，表现为"只能 chat 不能 work"
 - **根因**: 4 个接线点断裂：① `tool_registry.dart` 的 `registerBuiltin()` 方法体为空（只有注释）；② `main.dart` 未调用 `registerBuiltin()`；③ `chat_service.dart` 引用已删除的 `_toolDefinitions` 且未 import `tool_registry.dart`（编译错误）；④ `expressions` 版本号错误导致 pub get 失败
 - **解决**: 逐一修复 4 个断裂点：填充 registerBuiltin、main 中注册、chat_service 改用 `ToolRegistry().getEnabledSchemas()`、expressions 版本改为 ^0.2.5+3
+
+## #11 工具系统被联网搜索开关禁用
+- **现象**: 工具系统接线全部修复，日志显示 `schemasCount=7`（7个工具注册成功），但 AI 仍不调用工具
+- **根因**: Agent Loop 条件为 `provider.supportsToolUse && webSearchEnabled && enabledSchemas.isNotEmpty`，其中 `webSearchEnabled` 是"联网搜索"开关，用户关闭后整个工具系统被禁用。工具系统不应由"联网搜索"开关单独控制
+- **解决**: Agent Loop 条件改为 `provider.supportsToolUse && enabledSchemas.isNotEmpty`，不再依赖 `webSearchEnabled`。路径 B（规则搜索）仍由 `webSearchEnabled` 控制
+
+## #12 Log.d 使用 dart:developer 在 flutter run 控制台不可见
+- **现象**: `Log.d()` 调用了但 flutter run 控制台看不到任何输出
+- **根因**: `dart:developer` 的 `dev.log()` 输出到 Dart DevTools 日志面板，不会出现在 flutter run 的 stderr/stdout 控制台中
+- **解决**: 改用 `debugPrint()`，输出以 `I/flutter` 格式出现在控制台
+
+## #13 Gradle 下载 dl.google.com 超时导致编译失败
+- **现象**: `Could not download protos-32.0.1.jar` / `Read timed out` / `BUILD FAILED in 6m`
+- **根因**: geolocator_android 依赖需要从 `dl.google.com` 下载 Android tools 库，国内被墙
+- **解决**: 在 `android/build.gradle.kts` 和 `android/settings.gradle.kts` 中添加阿里云镜像仓库（`maven.aliyun.com/repository/google` 等）作为首选
