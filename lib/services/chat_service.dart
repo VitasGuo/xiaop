@@ -207,8 +207,8 @@ class ChatService {
       systemPrompt.writeln('以下是关于这个用户的记忆信息，你可以适当参考：');
       systemPrompt.writeln(memoryContext);
     }
-    // 引导 AI 使用工具
-    if (provider.supportsToolUse && webSearchEnabled) {
+    // 引导 AI 使用工具（只要 provider 支持且有已启用工具就引导）
+    if (provider.supportsToolUse) {
       systemPrompt.writeln('');
       systemPrompt.writeln('你可以使用工具来获取实时信息和处理任务。根据用户需求选择合适的工具调用，不需要工具时直接回答即可。');
       systemPrompt.writeln('当用户询问天气但未指定城市时，先调用 get_location 获取位置，再查天气。');
@@ -240,7 +240,8 @@ class ChatService {
 
     // ===== 路径 A：支持 Function Calling → Agent Loop =====
     final enabledSchemas = await ToolRegistry().getEnabledSchemas();
-    if (provider.supportsToolUse && webSearchEnabled && enabledSchemas.isNotEmpty) {
+    Log.d('工具系统: provider=${provider.displayName} supportsToolUse=${provider.supportsToolUse} webSearchEnabled=$webSearchEnabled schemasCount=${enabledSchemas.length}');
+    if (provider.supportsToolUse && enabledSchemas.isNotEmpty) {
       const maxIterations = 5;
       for (var iteration = 0; iteration <= maxIterations; iteration++) {
         final result = await _streamRequest(

@@ -1,17 +1,18 @@
-import 'dart:developer' as dev;
+import 'package:flutter/foundation.dart';
 
 class Log {
   static const String _tag = 'XiaoP';
 
   static void d(String message) {
-    dev.log(message, name: _tag);
+    debugPrint('[$_tag] $message');
   }
 
   static void e(String message, [Object? error, StackTrace? stackTrace]) {
-    dev.log('ERROR: $message', name: _tag, error: error, stackTrace: stackTrace);
+    debugPrint('[$_tag] ERROR: $message');
+    if (error != null) debugPrint('[$_tag] error detail: $error');
   }
 
   static void w(String message) {
-    dev.log('WARN: $message', name: _tag);
+    debugPrint('[$_tag] WARN: $message');
   }
 }
