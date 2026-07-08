@@ -23,6 +23,7 @@ class AiProviderConfig {
   final bool isCustom;
   final bool needsApiKey;
   final bool showUrlAndModel;
+  final bool supportsToolUse;
 
   const AiProviderConfig({
     required this.type,
@@ -35,6 +36,7 @@ class AiProviderConfig {
     this.isCustom = false,
     this.needsApiKey = true,
     this.showUrlAndModel = false,
+    this.supportsToolUse = false,
   });
 
   bool get hasPresetKey => presetApiKey != null && presetApiKey!.isNotEmpty;
@@ -77,6 +79,7 @@ class AiProviders {
     availableModels: [],
     needsApiKey: true,
     showUrlAndModel: true,
+    supportsToolUse: true,
   );
 
   static const deepseek = AiProviderConfig(
@@ -88,6 +91,7 @@ class AiProviders {
       'deepseek-v4-flash',
       'deepseek-v4-pro',
     ],
+    supportsToolUse: true,
   );
 
   static const qwen = AiProviderConfig(
@@ -100,6 +104,7 @@ class AiProviders {
       'qwen3.7-plus',
       'qwen3.6-flash',
     ],
+    supportsToolUse: true,
   );
 
   static const kimi = AiProviderConfig(
@@ -111,6 +116,7 @@ class AiProviders {
       'kimi-k2.5',
       'kimi-k2',
     ],
+    supportsToolUse: true,
   );
 
   static const zhipu = AiProviderConfig(
@@ -124,6 +130,7 @@ class AiProviders {
       'glm-4.7-flash',
       'glm-4.5-air',
     ],
+    supportsToolUse: true,
   );
 
   static const mimo = AiProviderConfig(
@@ -148,6 +155,7 @@ class AiProviders {
       'ernie-4.0-turbo-8k',
       'ernie-speed-128k',
     ],
+    supportsToolUse: true,
   );
 
   static const hunyuan = AiProviderConfig(
@@ -160,6 +168,7 @@ class AiProviders {
       'hunyuan-pro',
       'hunyuan-large',
     ],
+    supportsToolUse: true,
   );
 
   static const doubao = AiProviderConfig(
@@ -172,6 +181,7 @@ class AiProviders {
       'doubao-1.5-pro-256k',
       'doubao-1.5-lite-32k',
     ],
+    supportsToolUse: true,
   );
 
   static const custom = AiProviderConfig(

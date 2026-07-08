@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -164,6 +165,37 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   id: aiMsgId,
                   role: 'assistant',
                   content: text,
+                  timestamp: DateTime.now(),
+                );
+              }
+            });
+            _scrollToBottom();
+          }
+        },
+        onToolCall: (toolName, args) {
+          // 工具调用反馈：在流式输出中插入提示
+          String hint;
+          if (toolName == 'web_search') {
+            try {
+              final parsed = jsonDecode(args);
+              hint = '\n\n> 🔍 正在搜索: ${parsed['query'] ?? args}\n\n';
+            } catch (_) {
+              hint = '\n\n> 🔍 正在搜索: $args\n\n';
+            }
+          } else if (toolName == 'get_current_time') {
+            hint = '\n\n> 🕐 获取当前时间...\n\n';
+          } else {
+            hint = '\n\n> 🔧 调用工具: $toolName\n\n';
+          }
+          buffer.write(hint);
+          if (mounted) {
+            setState(() {
+              final idx = _messages.indexWhere((m) => m.id == aiMsgId);
+              if (idx != -1) {
+                _messages[idx] = ChatMessage(
+                  id: aiMsgId,
+                  role: 'assistant',
+                  content: buffer.toString(),
                   timestamp: DateTime.now(),
                 );
               }

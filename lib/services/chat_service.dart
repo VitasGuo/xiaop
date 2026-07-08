@@ -147,7 +147,39 @@ class ChatService {
     await prefs.remove('$_keyPrefix$conversationId');
   }
 
-  // ==================== AI 响应（流式） ====================
+  // ==================== AI 响应（流式 + Agent Loop） ====================
+
+  /// 工具定义 schema（OpenAI 兼容 function calling 格式）
+  static const _toolDefinitions = [
+    {
+      'type': 'function',
+      'function': {
+        'name': 'web_search',
+        'description': '搜索互联网获取最新信息、新闻、天气、价格等实时数据。当用户询问时效性信息或你不确定的事实时调用此工具。',
+        'parameters': {
+          'type': 'object',
+          'properties': {
+            'query': {
+              'type': 'string',
+              'description': '搜索关键词，用简洁的词语描述要查找的内容',
+            },
+          },
+          'required': ['query'],
+        },
+      },
+    },
+    {
+      'type': 'function',
+      'function': {
+        'name': 'get_current_time',
+        'description': '获取当前日期和时间。当用户询问今天日期、当前时间时调用。',
+        'parameters': {
+          'type': 'object',
+          'properties': {},
+        },
+      },
+    },
+  ];
 
   Future<void> streamAiResponse({
     required String conversationId,
@@ -162,6 +194,7 @@ class ChatService {
     required void Function(String token) onToken,
     required void Function(String fullText) onComplete,
     required void Function(String error) onError,
+    void Function(String toolName, String args)? onToolCall,
   }) async {
     final provider = AiProviders.getByName(providerName);
     if (provider == null) {
@@ -191,23 +224,8 @@ class ChatService {
 
     final memoryContext = await MemoryService.buildMemoryContext(userMessage);
 
-    // 联网搜索 - 开关开启 且 消息需要联网时才执行
-    String searchContext = '';
     final prefs = await SharedPreferences.getInstance();
     final webSearchEnabled = prefs.getBool('web_search_enabled') ?? true;
-    if (webSearchEnabled && _needsWebSearch(userMessage)) {
-      try {
-        final searchService = WebSearchService();
-        final searchQuery = _extractSearchQuery(userMessage);
-        Log.d('联网搜索触发: "$searchQuery"');
-        searchContext = await searchService.search(searchQuery).timeout(
-          const Duration(seconds: 8),
-          onTimeout: () => '',
-        );
-      } catch (e) {
-        Log.w('联网搜索失败: $e');
-      }
-    }
 
     final systemPrompt = StringBuffer();
     systemPrompt.writeln(companion.systemPrompt);
@@ -220,10 +238,10 @@ class ChatService {
       systemPrompt.writeln('以下是关于这个用户的记忆信息，你可以适当参考：');
       systemPrompt.writeln(memoryContext);
     }
-    if (searchContext.isNotEmpty) {
+    // 引导 AI 使用工具
+    if (provider.supportsToolUse && webSearchEnabled) {
       systemPrompt.writeln('');
-      systemPrompt.writeln('以下是联网搜索到的相关信息，你可以参考回答用户问题：');
-      systemPrompt.writeln(searchContext);
+      systemPrompt.writeln('你可以使用工具来获取实时信息。当需要最新资讯、天气、价格等时效性信息时，请调用 web_search 工具。当需要当前日期时间时，请调用 get_current_time 工具。不需要时直接回答即可。');
     }
 
     final messages = await getMessages(conversationId);
@@ -242,11 +260,149 @@ class ChatService {
       headers['Authorization'] = 'Bearer $apiKey';
     }
 
-    final buffer = StringBuffer();
+    // 构建 API 消息列表（循环中会追加 tool 消息）
+    final apiMessages = <Map<String, dynamic>>[
+      {'role': 'system', 'content': systemPrompt.toString()},
+      ...recentMessages.map((m) => {'role': m.role, 'content': m.content}),
+    ];
+
+    final fullBuffer = StringBuffer();
+
+    // ===== 路径 A：支持 Function Calling → Agent Loop =====
+    if (provider.supportsToolUse && webSearchEnabled) {
+      const maxIterations = 5;
+      for (var iteration = 0; iteration < maxIterations; iteration++) {
+        final result = await _streamRequest(
+          dio: dio,
+          url: '$baseUrl/chat/completions',
+          headers: headers,
+          modelName: modelName,
+          messages: apiMessages,
+          enableThinking: enableThinking,
+          tools: _toolDefinitions,
+          cancelToken: cancelToken,
+          onToken: onToken,
+        );
+
+        if (result.error != null) {
+          if (fullBuffer.isNotEmpty) {
+            onComplete(fullBuffer.toString());
+          } else {
+            onError(result.error!);
+          }
+          return;
+        }
+
+        // 累积内容
+        if (result.content.isNotEmpty) {
+          fullBuffer.write(result.content);
+        }
+
+        // 有工具调用 → 执行并循环
+        if (result.toolCalls.isNotEmpty) {
+          // 把 assistant 消息（含 tool_calls）加入上下文
+          final assistantMsg = <String, dynamic>{
+            'role': 'assistant',
+            if (result.content.isNotEmpty) 'content': result.content,
+            'tool_calls': result.toolCalls.map((tc) => tc.toApiJson()).toList(),
+          };
+          apiMessages.add(assistantMsg);
+
+          // 执行每个工具调用
+          for (final tc in result.toolCalls) {
+            final toolResult = await _executeTool(tc.name, tc.arguments);
+            apiMessages.add({
+              'role': 'tool',
+              'tool_call_id': tc.id,
+              'content': toolResult,
+            });
+            // UI 反馈
+            if (onToolCall != null) {
+              onToolCall(tc.name, tc.arguments);
+            }
+          }
+          // 继续循环，让 AI 看到工具结果后继续
+          continue;
+        }
+
+        // 无工具调用 → 完成
+        onComplete(fullBuffer.toString());
+        return;
+      }
+      // 超过最大轮数
+      if (fullBuffer.isNotEmpty) {
+        onComplete(fullBuffer.toString());
+      } else {
+        onError('工具调用轮数超限');
+      }
+      return;
+    }
+
+    // ===== 路径 B：不支持 Function Calling → 规则触发搜索 =====
+    String searchContext = '';
+    if (webSearchEnabled && _needsWebSearch(userMessage)) {
+      try {
+        final searchService = WebSearchService();
+        final searchQuery = _extractSearchQuery(userMessage);
+        Log.d('联网搜索触发(规则): "$searchQuery"');
+        searchContext = await searchService.search(searchQuery).timeout(
+          const Duration(seconds: 8),
+          onTimeout: () => '',
+        );
+      } catch (e) {
+        Log.w('联网搜索失败: $e');
+      }
+    }
+
+    if (searchContext.isNotEmpty) {
+      apiMessages.insert(1, {
+        'role': 'system',
+        'content': '以下是联网搜索到的相关信息，你可以参考回答用户问题：\n$searchContext',
+      });
+    }
+
+    final result = await _streamRequest(
+      dio: dio,
+      url: '$baseUrl/chat/completions',
+      headers: headers,
+      modelName: modelName,
+      messages: apiMessages,
+      enableThinking: enableThinking,
+      tools: null,
+      cancelToken: cancelToken,
+      onToken: onToken,
+    );
+
+    if (result.error != null) {
+      if (result.content.isNotEmpty) {
+        onComplete(result.content);
+      } else {
+        onError(result.error!);
+      }
+    } else {
+      onComplete(result.content);
+    }
+  }
+
+  /// 执行单次流式请求，解析 SSE
+  Future<_StreamResult> _streamRequest({
+    required Dio dio,
+    required String url,
+    required Map<String, String> headers,
+    required String modelName,
+    required List<Map<String, dynamic>> messages,
+    required bool enableThinking,
+    required List<Map<String, dynamic>>? tools,
+    CancelToken? cancelToken,
+    required void Function(String token) onToken,
+  }) async {
+    final contentBuffer = StringBuffer();
+    final toolCallAccumulator = <int, _ToolCallBuilder>{};
+    String? finishReason;
 
     try {
       final response = await dio.post(
-        '$baseUrl/chat/completions',
+        url,
         options: Options(
           headers: headers,
           responseType: ResponseType.stream,
@@ -254,81 +410,154 @@ class ChatService {
         cancelToken: cancelToken,
         data: {
           if (modelName.isNotEmpty) 'model': modelName,
-          'messages': [
-            {'role': 'system', 'content': systemPrompt.toString()},
-            ...recentMessages.map((m) => {'role': m.role, 'content': m.content}),
-          ],
+          'messages': messages,
           'temperature': 0.7,
           'max_tokens': 4096,
           'stream': true,
+          // ignore: use_null_aware_elements
+          if (tools != null) 'tools': tools,
           if (enableThinking) 'reasoning': {'effort': 'high'},
         },
       );
 
-      if (response.statusCode == 200) {
-        String leftover = '';
-        await for (final chunk in response.data!.stream) {
-          leftover += utf8.decode(chunk, allowMalformed: true);
-          final lines = leftover.split('\n');
-          leftover = lines.removeLast(); // 最后一段可能不完整，保留到下次
+      if (response.statusCode != 200) {
+        return _StreamResult(error: '请求失败: ${response.statusCode}');
+      }
 
-          for (final line in lines) {
-            if (line.startsWith('data: ')) {
-              final data = line.substring(6).trim();
-              if (data == '[DONE]') continue;
-              try {
-                final json = jsonDecode(data) as Map<String, dynamic>;
-                final choices = json['choices'] as List?;
-                if (choices != null && choices.isNotEmpty) {
-                  final delta = choices[0]['delta'] as Map<String, dynamic>?;
-                  if (delta != null) {
-                    final reasoning = delta['reasoning_content'] as String?;
-                    if (reasoning != null && reasoning.isNotEmpty) {
-                      onToken(reasoning);
-                    }
-                    if (delta['content'] != null) {
-                      final token = delta['content'] as String;
-                      buffer.write(token);
-                      onToken(token);
-                    }
-                  }
+      String leftover = '';
+      await for (final chunk in response.data!.stream) {
+        leftover += utf8.decode(chunk, allowMalformed: true);
+        final lines = leftover.split('\n');
+        leftover = lines.removeLast();
+
+        for (final line in lines) {
+          if (!line.startsWith('data: ')) continue;
+          final data = line.substring(6).trim();
+          if (data == '[DONE]') continue;
+          try {
+            final json = jsonDecode(data) as Map<String, dynamic>;
+            final choices = json['choices'] as List?;
+            if (choices == null || choices.isEmpty) continue;
+            final choice = choices[0] as Map<String, dynamic>;
+            final delta = choice['delta'] as Map<String, dynamic>?;
+            final reason = choice['finish_reason'] as String?;
+            if (reason != null) finishReason = reason;
+
+            if (delta == null) continue;
+
+            // 推理内容
+            final reasoning = delta['reasoning_content'] as String?;
+            if (reasoning != null && reasoning.isNotEmpty) {
+              onToken(reasoning);
+            }
+
+            // 正文内容
+            final content = delta['content'] as String?;
+            if (content != null) {
+              contentBuffer.write(content);
+              onToken(content);
+            }
+
+            // 工具调用（流式分片，需按 index 累积）
+            final toolCalls = delta['tool_calls'] as List?;
+            if (toolCalls != null) {
+              for (final tc in toolCalls) {
+                final tcMap = tc as Map<String, dynamic>;
+                final index = tcMap['index'] as int? ?? 0;
+                final builder = toolCallAccumulator.putIfAbsent(index, () => _ToolCallBuilder());
+
+                final id = tcMap['id'] as String?;
+                if (id != null) builder.id = id;
+
+                final fn = tcMap['function'] as Map<String, dynamic>?;
+                if (fn != null) {
+                  final name = fn['name'] as String?;
+                  if (name != null) builder.name = name;
+                  final args = fn['arguments'] as String?;
+                  if (args != null) builder.arguments += args;
                 }
-              } catch (e) {
-                Log.w('SSE解析异常: $e');
               }
             }
+          } catch (e) {
+            Log.w('SSE解析异常: $e');
           }
         }
+      }
 
-        onComplete(buffer.toString());
-      } else {
-        onError('请求失败: ${response.statusCode}');
+      // 构建工具调用列表
+      final parsedToolCalls = <_ToolCall>[];
+      if (toolCallAccumulator.isNotEmpty) {
+        final sortedKeys = toolCallAccumulator.keys.toList()..sort();
+        for (final key in sortedKeys) {
+          final builder = toolCallAccumulator[key]!;
+          if (builder.name != null) {
+            parsedToolCalls.add(_ToolCall(
+              id: builder.id ?? 'call_$key',
+              name: builder.name!,
+              arguments: builder.arguments,
+            ));
+          }
+        }
+      }
+
+      return _StreamResult(
+        content: contentBuffer.toString(),
+        toolCalls: parsedToolCalls,
+        finishReason: finishReason,
+      );
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.cancel) {
+        return _StreamResult(content: contentBuffer.toString());
+      }
+      String msg = '连接失败';
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.receiveTimeout) {
+        msg = '连接超时';
+      } else if (e.type == DioExceptionType.connectionError) {
+        msg = '无法连接';
+      } else if (e.response != null) {
+        msg = '请求失败: ${e.response?.statusCode}';
+      }
+      return _StreamResult(content: contentBuffer.toString(), error: msg);
+    } catch (e) {
+      return _StreamResult(content: contentBuffer.toString(), error: '连接失败: $e');
+    }
+  }
+
+  /// 执行工具调用，返回结果文本
+  Future<String> _executeTool(String name, String arguments) async {
+    try {
+      final args = arguments.isNotEmpty
+          ? jsonDecode(arguments) as Map<String, dynamic>
+          : <String, dynamic>{};
+
+      switch (name) {
+        case 'web_search':
+          final query = args['query'] as String? ?? '';
+          if (query.isEmpty) return '搜索关键词为空';
+          Log.d('工具调用 web_search: "$query"');
+          final result = await WebSearchService().search(query).timeout(
+            const Duration(seconds: 10),
+            onTimeout: () => '搜索超时',
+          );
+          return result.isEmpty ? '未找到相关结果' : result;
+
+        case 'get_current_time':
+          final now = DateTime.now();
+          return '当前时间: ${now.year}年${now.month}月${now.day}日 ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}（星期${_weekday(now.weekday)}）';
+
+        default:
+          return '未知工具: $name';
       }
     } catch (e) {
-      // 用户主动取消不报错
-      if (e is DioException && e.type == DioExceptionType.cancel) {
-        if (buffer.isNotEmpty) {
-          onComplete(buffer.toString());
-        }
-        return;
-      }
-      if (buffer.isNotEmpty) {
-        onComplete(buffer.toString());
-      } else {
-        String msg = '连接失败';
-        if (e is DioException) {
-          if (e.type == DioExceptionType.connectionTimeout ||
-              e.type == DioExceptionType.receiveTimeout) {
-            msg = '连接超时';
-          } else if (e.type == DioExceptionType.connectionError) {
-            msg = '无法连接: $baseUrl';
-          } else if (e.response != null) {
-            msg = '请求失败: ${e.response?.statusCode}';
-          }
-        }
-        onError(msg);
-      }
+      Log.w('工具执行失败: $e');
+      return '工具执行失败: $e';
     }
+  }
+
+  String _weekday(int n) {
+    const map = ['', '一', '二', '三', '四', '五', '六', '日'];
+    return map[n];
   }
 
   // ==================== AI 记忆提取 ====================
@@ -502,4 +731,41 @@ importance: 1-5（1=琐碎，5=核心信息）
     }
     return query.isEmpty ? message : query;
   }
+}
+
+/// 单次流式请求的结果
+class _StreamResult {
+  final String content;
+  final List<_ToolCall> toolCalls;
+  final String? finishReason;
+  final String? error;
+
+  _StreamResult({
+    this.content = '',
+    this.toolCalls = const [],
+    this.finishReason,
+    this.error,
+  });
+}
+
+/// 解析后的工具调用
+class _ToolCall {
+  final String id;
+  final String name;
+  final String arguments;
+
+  _ToolCall({required this.id, required this.name, required this.arguments});
+
+  Map<String, dynamic> toApiJson() => {
+    'id': id,
+    'type': 'function',
+    'function': {'name': name, 'arguments': arguments},
+  };
+}
+
+/// 流式 tool_calls 累积构建器（按 index 拼装分片）
+class _ToolCallBuilder {
+  String? id;
+  String? name;
+  String arguments = '';
 }

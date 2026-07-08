@@ -1,8 +1,19 @@
 # 小P 进度
 
-## 当前版本: v1.2.7
+## 当前版本: v1.3.0
 
 ## 版本历史
+
+### v1.3.0 (2026-07-08)
+- **Agent Loop（智能体循环）**：
+  - 支持 Function Calling 的 provider（DeepSeek/Qwen/Kimi/GLM/豆包/混元/文心/LM Studio）启用 AI 自主工具调用
+  - AI 可多轮调用 web_search + get_current_time 工具，最多 5 轮
+  - 流式解析 tool_calls 分片累积，执行工具后结果回传 AI 继续思考
+  - 不支持的 provider（SenseNova/MiMo/自定义）自动回退规则触发搜索
+  - UI 展示工具调用过程（🔍 正在搜索 / 🕐 获取时间）
+- 联网搜索改用必应中国（cn.bing.com），DuckDuckGo 国内不可访问
+- 智能触发规则（时效/事实/搜索意图关键词），避免情感聊天也搜索
+- http 包改为 Dio，减少外部依赖
 
 ### v1.2.7 (2026-07-08)
 - 发布前代码审查全量修复：
