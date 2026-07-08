@@ -40,8 +40,11 @@ class AiConfig {
 }
 
 class AiConfigNotifier extends StateNotifier<AiConfig> {
+  /// provider 初始化完成的 Future，外部可 await 确保状态已从磁盘加载
+  late final Future<void> initialized;
+
   AiConfigNotifier() : super(const AiConfig()) {
-    _load();
+    initialized = _load();
   }
 
   static const _keyProvider = 'ai_selected_provider';

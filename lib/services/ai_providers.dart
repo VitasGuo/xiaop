@@ -72,8 +72,8 @@ class AiProviders {
   static const lmstudio = AiProviderConfig(
     type: AiProviderType.lmstudio,
     displayName: 'LM Studio (本地)',
-    defaultBaseUrl: 'http://192.168.1.10:1234/v1',
-    defaultModel: 'google/gemma-4-12b-qat',
+    defaultBaseUrl: '',
+    defaultModel: '',
     availableModels: [],
     needsApiKey: true,
     showUrlAndModel: true,

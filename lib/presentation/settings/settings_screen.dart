@@ -51,6 +51,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _loadSettings() async {
     final tts = TtsService();
+    // 等待 provider 从磁盘加载完成，避免读到初始空值导致 URL/Model 回退到默认
+    await ref.read(aiConfigProvider.notifier).initialized;
     final aiConfig = ref.read(aiConfigProvider);
     final apiKey = await ApiKeyService.getApiKey(aiConfig.provider);
     final prefs = await SharedPreferences.getInstance();
@@ -241,7 +243,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         TextField(
           controller: _modelController,
           decoration: InputDecoration(
-            hintText: '输入模型名称',
+            hintText: '如 google/gemma-3-12b',
             hintStyle: TextStyle(color: AppTheme.textSecondary),
             suffixIcon: Row(
               mainAxisSize: MainAxisSize.min,
