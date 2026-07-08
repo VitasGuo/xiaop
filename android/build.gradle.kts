@@ -1,5 +1,9 @@
 allprojects {
     repositories {
+        // 阿里云镜像（国内加速，解决 dl.google.com 超时）
+        maven { url = uri("https://maven.aliyun.com/repository/google") }
+        maven { url = uri("https://maven.aliyun.com/repository/central") }
+        maven { url = uri("https://maven.aliyun.com/repository/gradle-plugin") }
         google()
         mavenCentral()
     }
