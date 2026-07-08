@@ -1,5 +1,4 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';
 import 'package:xiao_p/utils/logger.dart';
 
 class WebSearchService {
@@ -7,75 +6,138 @@ class WebSearchService {
   factory WebSearchService() => _instance;
   WebSearchService._();
 
+  final Dio _dio = Dio(BaseOptions(
+    connectTimeout: const Duration(seconds: 10),
+    receiveTimeout: const Duration(seconds: 10),
+    followRedirects: true,
+    validateStatus: (s) => s != null && s < 400,
+  ));
+
   /// 搜索并返回摘要文本
   Future<String> search(String query, {int maxResults = 5}) async {
     try {
-      return await _searchDuckDuckGo(query, maxResults);
+      return await _searchBing(query, maxResults);
     } catch (e) {
-      Log.w('DuckDuckGo搜索失败: $e');
-      try {
-        return await _searchLite(query, maxResults);
-      } catch (e2) {
-        Log.w('Lite搜索也失败: $e2');
-        return '';
-      }
+      Log.w('必应搜索失败: $e');
+      return '';
     }
   }
 
-  /// DuckDuckGo instant answer API
-  Future<String> _searchDuckDuckGo(String query, int maxResults) async {
-    final url = Uri.parse(
-      'https://api.duckduckgo.com/?q=${Uri.encodeComponent(query)}&format=json&no_html=1&skip_disambig=1',
+  /// 必应中国搜索（国内可访问，无需 API key）
+  Future<String> _searchBing(String query, int maxResults) async {
+    final url = 'https://cn.bing.com/search?q=${Uri.encodeComponent(query)}&count=$maxResults&setlang=zh-CN';
+
+    final response = await _dio.get(
+      url,
+      options: Options(
+        headers: {
+          'User-Agent':
+              'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+          'Accept-Language': 'zh-CN,zh;q=0.9',
+        },
+        responseType: ResponseType.plain,
+      ),
     );
 
-    final response = await http.get(url).timeout(const Duration(seconds: 10));
-    if (response.statusCode != 200) return '';
-
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
-    final buffer = StringBuffer();
-
-    final abstract = data['AbstractText'] as String? ?? '';
-    if (abstract.isNotEmpty) {
-      buffer.writeln(abstract);
+    if (response.statusCode != 200) {
+      Log.w('必应搜索返回 ${response.statusCode}');
+      return '';
     }
 
-    final relatedTopics = data['RelatedTopics'] as List? ?? [];
-    for (final topic in relatedTopics.take(maxResults)) {
-      if (topic is Map<String, dynamic>) {
-        final text = topic['Text'] as String? ?? '';
-        final firstUrl = topic['FirstURL'] as String? ?? '';
-        if (text.isNotEmpty) {
-          buffer.writeln('- $text');
-          if (firstUrl.isNotEmpty) buffer.writeln('  来源: $firstUrl');
-        }
+    final body = response.data.toString();
+    final results = _parseBingResults(body, maxResults);
+
+    if (results.isEmpty) return '';
+
+    final buffer = StringBuffer();
+    buffer.writeln('搜索"$query"的结果：');
+    for (final r in results) {
+      buffer.writeln('- ${r.title}');
+      if (r.snippet.isNotEmpty) {
+        buffer.writeln('  ${r.snippet}');
+      }
+      if (r.url.isNotEmpty) {
+        buffer.writeln('  来源: ${r.url}');
       }
     }
-
     return buffer.toString().trim();
   }
 
-  /// 简单的 HTML 搜索（备用）
-  Future<String> _searchLite(String query, int maxResults) async {
-    final url = Uri.parse(
-      'https://lite.duckduckgo.com/lite/?q=${Uri.encodeComponent(query)}',
+  /// 解析必应搜索结果 HTML
+  List<_SearchResult> _parseBingResults(String html, int maxResults) {
+    final results = <_SearchResult>[];
+
+    // 必应每个结果在 <li class="b_algo">...</li> 中
+    final liRegex = RegExp(
+      r'<li[^>]*class="b_algo"[^>]*>([\s\S]*?)</li>',
     );
+    final matches = liRegex.allMatches(html);
 
-    final response = await http.get(
-      url,
-      headers: {'User-Agent': 'Mozilla/5.0'},
-    ).timeout(const Duration(seconds: 10));
+    for (final match in matches) {
+      if (results.length >= maxResults) break;
+      final block = match.group(1) ?? '';
 
-    if (response.statusCode != 200) return '';
+      // 提取标题（在 <h2><a>...</a></h2> 中）
+      String title = '';
+      final titleRegex = RegExp(r'<h2[^>]*>[\s\S]*?<a[^>]*>([\s\S]*?)</a>', caseSensitive: false);
+      final titleMatch = titleRegex.firstMatch(block);
+      if (titleMatch != null) {
+        title = _stripHtml(titleMatch.group(1) ?? '');
+      }
 
-    // 简单提取纯文本
-    String html = response.body;
-    html = html.replaceAll(RegExp(r'<[^>]+>'), ' ');
-    html = html.replaceAll(RegExp(r'\s+'), ' ').trim();
+      // 提取链接
+      String url = '';
+      final hrefRegex = RegExp(r'<a[^>]*href="([^"]+)"', caseSensitive: false);
+      final hrefMatch = hrefRegex.firstMatch(block);
+      if (hrefMatch != null) {
+        url = hrefMatch.group(1) ?? '';
+      }
 
-    // 截取前2000字符作为摘要
-    if (html.length > 2000) {
-      html = '${html.substring(0, 2000)}...';
+      // 提取摘要（在 <p> 或 class含caption的div中）
+      String snippet = '';
+      final pRegex = RegExp(r'<p[^>]*>([\s\S]*?)</p>', caseSensitive: false);
+      final pMatch = pRegex.firstMatch(block);
+      if (pMatch != null) {
+        snippet = _stripHtml(pMatch.group(1) ?? '');
+      }
+      // 如果 p 没有内容，尝试 caption div
+      if (snippet.isEmpty) {
+        final capRegex = RegExp(
+          r'<div[^>]*class="[^"]*b_caption[^"]*"[^>]*>([\s\S]*?)</div>',
+          caseSensitive: false,
+        );
+        final capMatch = capRegex.firstMatch(block);
+        if (capMatch != null) {
+          snippet = _stripHtml(capMatch.group(1) ?? '');
+        }
+      }
+
+      if (title.isNotEmpty || snippet.isNotEmpty) {
+        results.add(_SearchResult(title: title, snippet: snippet, url: url));
+      }
     }
-    return html;
+
+    return results;
   }
+
+  /// 去除 HTML 标签和多余空白
+  String _stripHtml(String html) {
+    return html
+        .replaceAll(RegExp(r'<[^>]+>'), '')
+        .replaceAll('&nbsp;', ' ')
+        .replaceAll('&amp;', '&')
+        .replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>')
+        .replaceAll('&quot;', '"')
+        .replaceAll('&#39;', "'")
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+  }
+}
+
+class _SearchResult {
+  final String title;
+  final String snippet;
+  final String url;
+  _SearchResult({required this.title, required this.snippet, required this.url});
 }

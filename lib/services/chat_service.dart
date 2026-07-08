@@ -191,15 +191,17 @@ class ChatService {
 
     final memoryContext = await MemoryService.buildMemoryContext(userMessage);
 
-    // 联网搜索 - 根据设置开关决定是否执行
+    // 联网搜索 - 开关开启 且 消息需要联网时才执行
     String searchContext = '';
     final prefs = await SharedPreferences.getInstance();
     final webSearchEnabled = prefs.getBool('web_search_enabled') ?? true;
-    if (webSearchEnabled) {
+    if (webSearchEnabled && _needsWebSearch(userMessage)) {
       try {
         final searchService = WebSearchService();
-        searchContext = await searchService.search(userMessage).timeout(
-          const Duration(seconds: 5),
+        final searchQuery = _extractSearchQuery(userMessage);
+        Log.d('联网搜索触发: "$searchQuery"');
+        searchContext = await searchService.search(searchQuery).timeout(
+          const Duration(seconds: 8),
           onTimeout: () => '',
         );
       } catch (e) {
@@ -441,5 +443,63 @@ importance: 1-5（1=琐碎，5=核心信息）
     } catch (e) {
       Log.w('解析AI记忆失败: $e');
     }
+  }
+
+  /// 判断用户消息是否需要联网搜索
+  /// 情感陪伴场景下大部分对话不需要搜索，仅当时效性/事实性问题时触发
+  static const _factKeywords = [
+    '最新', '今天', '昨天', '明天', '近期', '最近', '现在', '当前', '实时',
+    '新闻', '天气', '温度', '预报',
+    '价格', '多少钱', '股价', '汇率', '利率',
+    '发布', '更新', '上线', '出',
+    '比分', '排名', '排行', '赛果',
+    '2024', '2025', '2026',
+  ];
+
+  static const _searchIntents = [
+    '搜索', '搜一下', '查一下', '帮我查', '帮我搜', '联网', '查询', '查找',
+  ];
+
+  static const _factQuestions = [
+    '几点', '什么时候', '在哪', '哪里', '是多少', '多少钱',
+    '是谁', '什么是', '怎么回事',
+  ];
+
+  bool _needsWebSearch(String message) {
+    // 明确搜索意图
+    for (final kw in _searchIntents) {
+      if (message.contains(kw)) return true;
+    }
+    // 时效/事实关键词
+    for (final kw in _factKeywords) {
+      if (message.contains(kw)) return true;
+    }
+    // 事实性疑问
+    for (final kw in _factQuestions) {
+      if (message.contains(kw)) return true;
+    }
+    return false;
+  }
+
+  /// 从用户消息提取搜索关键词
+  String _extractSearchQuery(String message) {
+    // 去掉标点和常见语气词，截取有效部分
+    var query = message
+        .replaceAll(RegExp(r'[，。！？、…~\s]+$'), '')
+        .replaceAll(RegExp(r'^[，。！？、…~\s]+'), '');
+
+    // 去掉搜索意图前缀
+    for (final prefix in ['帮我搜一下', '帮我搜索', '帮我查一下', '帮我查', '搜一下', '搜索', '查一下', '查询', '查找']) {
+      if (query.startsWith(prefix)) {
+        query = query.substring(prefix.length).trim();
+        break;
+      }
+    }
+
+    // 限制长度，避免搜索词过长
+    if (query.length > 60) {
+      query = query.substring(0, 60);
+    }
+    return query.isEmpty ? message : query;
   }
 }
